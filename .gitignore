@@ -1,0 +1,14 @@
+*.pdf
+*.tex
+run*
+*.out
+out
+bin/
+lib/
+*.[ao]
+*.text
+*.mem
+*.vcd
+*.gtkw
+*tmp*
+*.txt
