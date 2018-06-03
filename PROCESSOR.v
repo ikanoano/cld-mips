@@ -20,6 +20,7 @@ reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB], ldd[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[ID:WB];
+reg           btaken_mm=0;
 
 integer i;
 always @(posedge clk) begin
@@ -45,7 +46,6 @@ end
 
 // IF ------------------------------------------------------------
 wire[32-1:0]  pc4_if = pc[IF]+4;
-wire          btaken_mm;
 always @(posedge clk) begin
   pc[IF] <=
     rst         ? 0         :
@@ -121,12 +121,16 @@ wire[32-1:0]  jump_addr   = {pc[ID][31:28],      immj[ID], 2'b0};
 // (opcode[ID] == `INST_R && funct[ID] == `FUNCT_JALR);
 //assign      jr  =   //jump register
 //  opcode[ID] == `INST_R && (funct[ID] == `FUNCT_JR || funct[ID] == `FUNCT_JALR);
+reg   opj=0, opbeq=0, opbne=0;
 always @(posedge clk) begin
   btpc[EX] <=  // branch target
     //opcode[ID]==`INST_J_JAL ||
     opcode[ID]==`INST_J_J   ? jump_addr   :
     //jr                      ? rrs_fwd_ex  :
                               branch_addr;
+  opj   <= opcode[ID]==`INST_J_J    && valid[ID];
+  opbeq <= opcode[ID]==`INST_I_BEQ  && valid[ID];
+  opbne <= opcode[ID]==`INST_I_BNE  && valid[ID];
 end
 
 // comparing r[st]==rd for 2nd forwarding
@@ -135,6 +139,7 @@ always @(posedge clk) rsrd <= rs[ID]==rd[EX];
 always @(posedge clk) rtrd <= rt[ID]==rd[EX];
 // EX ------------------------------------------------------------
 // 2nd forwarding
+
 wire[32-1:0]  rrs_fwd =
     rsrd && rwe[MM] && valid[MM]/*&&~mld[MM]*/? rslt_mm   : // alu result in MM
                                                 rrs[EX];
@@ -151,10 +156,11 @@ ALU alu (
 
 always @(posedge clk) rrs[MM] <= rst ? 0 :rrs_fwd; // update
 always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
-reg   opj=0, opbeq=0, opbne=0;
-always @(posedge clk) opj   <= opcode[EX]==`INST_J_J    && valid[EX];
-always @(posedge clk) opbeq <= opcode[EX]==`INST_I_BEQ  && valid[EX];
-always @(posedge clk) opbne <= opcode[EX]==`INST_I_BNE  && valid[EX];
+always @(posedge clk) btaken_mm  <= // branch condition
+  //jal || jr ||
+  opj                         ||
+  (opbeq && rrs_fwd==rrt_fwd) ||
+  (opbne && rrs_fwd!=rrt_fwd);
 
 always @(posedge clk) begin
   if(((rs[EX]==rd[MM] || rt[EX]==rd[MM]) && mld[MM] && valid[MM]) ||
@@ -177,12 +183,6 @@ MEM #(
 );
 always @(posedge clk) ldd[WB]   <= rst ? 0 : w_ldd;
 always @(posedge clk) rslt[WB]  <= rst ? 0 : rslt_mm;
-
-assign  btaken_mm = // branch condition
-  //jal || jr ||
-  opj                         ||
-  (opbeq && rrs[MM]==rrt[MM]) ||
-  (opbne && rrs[MM]!=rrt[MM]);
 
 
 // WB ------------------------------------------------------------
