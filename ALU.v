@@ -37,7 +37,6 @@ wire[32-1:0]  rrt       =
   opcode==`INST_I_ORI   ||
   opcode==`INST_I_XORI  ? imm_z :
                           imm_s;
-wire[ 5-1:0]  shamt     = funct[2] ? rrs[4:0] : shamt_in;
 
 reg [32-1:0]  rslt_add, rslt_sub, rslt_and, rslt_or, rslt_xor,
               rslt_sll, rslt_srl, rslt_sra, rslt_slt, rslt_sltu;
@@ -49,9 +48,9 @@ always @(posedge clk) begin
   rslt_and    <= rst ? 0 : rrs & rrt;
   rslt_or     <= rst ? 0 : rrs | rrt;
   rslt_xor    <= rst ? 0 : rrs ^ rrt;
-  rslt_sll    <= rst ? 0 : rrt << shamt;
-  rslt_srl    <= rst ? 0 : rrt >> shamt;
-  rslt_sra    <= rst ? 0 : $signed(rrt) >>> shamt;
+  rslt_sll    <= rst ? 0 : rrt << shamt_in;
+  rslt_srl    <= rst ? 0 : rrt >> shamt_in;
+  rslt_sra    <= rst ? 0 : $signed(rrt) >>> shamt_in;
   rslt_slt    <= rst ? 0 : $signed(rrs) < $signed(rrt) ? 32'b1 : 32'b0;
   rslt_sltu   <= rst ? 0 :         rrs  <         rrt  ? 32'b1 : 32'b0;
   rslt_sel    <=
@@ -81,9 +80,9 @@ always @(posedge clk) begin
     opcode==`INST_R && funct==`FUNCT_SLL      ? SEL_SLL :
     opcode==`INST_R && funct==`FUNCT_SRL      ? SEL_SRL :
     opcode==`INST_R && funct==`FUNCT_SRA      ? SEL_SRA :
-    opcode==`INST_R && funct==`FUNCT_SLLV     ? SEL_SLL :
-    opcode==`INST_R && funct==`FUNCT_SRLV     ? SEL_SRL :
-    opcode==`INST_R && funct==`FUNCT_SRAV     ? SEL_SRA :
+//  opcode==`INST_R && funct==`FUNCT_SLLV     ? SEL_SLL :
+//  opcode==`INST_R && funct==`FUNCT_SRLV     ? SEL_SRL :
+//  opcode==`INST_R && funct==`FUNCT_SRAV     ? SEL_SRA :
     opcode==`INST_R && funct==`FUNCT_SLT      ? SEL_SLT :
     opcode==`INST_R && funct==`FUNCT_SLTU     ? SEL_SLTU:
                                                 4'hX;
