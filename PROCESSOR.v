@@ -45,11 +45,12 @@ always @(posedge clk) begin
 end
 
 // IF ------------------------------------------------------------
+wire[32-1:0]  pc4_if = pc[IF]+4;
 always @(posedge clk) begin
   pc[IF] <=
     rst         ? 0         :
     btaken      ? btpc[EX]  :
-                  pc[IF]+4;
+                  pc4_if;
 end
 
 wire[32-1:0]  ir;
@@ -124,12 +125,16 @@ wire[32-1:0]  jump_addr   = {pc[ID][31:28],      immj[ID], 2'b0};
 // (opcode[ID] == `INST_R && funct[ID] == `FUNCT_JALR);
 //assign      jr  =   //jump register
 //  opcode[ID] == `INST_R && (funct[ID] == `FUNCT_JR || funct[ID] == `FUNCT_JALR);
+reg   opj=0, opbeq=0, opbne=0;
 always @(posedge clk) begin
   btpc[EX] <=  // branch target
-  //opcode[ID]==`INST_J_JAL ||
-  opcode[ID]==`INST_J_J   ? jump_addr   :
-  //jr                      ? rrs_fwd_ex  :
-                            branch_addr;
+    //opcode[ID]==`INST_J_JAL ||
+    opcode[ID]==`INST_J_J   ? jump_addr   :
+    //jr                      ? rrs_fwd_ex  :
+                              branch_addr;
+  opj   <= opcode[ID]==`INST_J_J    && valid[ID];
+  opbeq <= opcode[ID]==`INST_I_BEQ  && valid[ID];
+  opbne <= opcode[ID]==`INST_I_BNE  && valid[ID];
 end
 
 
@@ -154,9 +159,9 @@ always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
 
 assign  btaken = // branch condition
   //jal || jr ||
-  opcode[EX]==`INST_J_J                               ||
-  opcode[EX]==`INST_I_BEQ && rrs_fwd[EX]==rrt_fwd[EX] ||
-  opcode[EX]==`INST_I_BNE && rrs_fwd[EX]!=rrt_fwd[EX];
+  opj                         ||
+  (opbeq && rrs_fwd==rrt_fwd) ||
+  (opbne && rrs_fwd!=rrt_fwd);
 
 
 // MM ------------------------------------------------------------
