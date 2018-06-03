@@ -40,7 +40,7 @@
 
 `define FUNCT_SLL       6'h00
 `define FUNCT_SRL       6'h02
-`define FUNCT_SRA       6'h03
+//`define FUNCT_SRA       6'h03
 //`define FUNCT_SLLV      6'h04
 //`define FUNCT_SRLV      6'h06
 //`define FUNCT_SRAV      6'h07

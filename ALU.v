@@ -50,7 +50,7 @@ always @(posedge clk) begin
   rslt_xor    <= rst ? 0 : rrs ^ rrt;
   rslt_sll    <= rst ? 0 : rrt << shamt_in;
   rslt_srl    <= rst ? 0 : rrt >> shamt_in;
-  rslt_sra    <= rst ? 0 : $signed(rrt) >>> shamt_in;
+//rslt_sra    <= rst ? 0 : $signed(rrt) >>> shamt_in;
   rslt_slt    <= rst ? 0 : $signed(rrs) < $signed(rrt) ? 32'b1 : 32'b0;
   rslt_sltu   <= rst ? 0 :         rrs  <         rrt  ? 32'b1 : 32'b0;
   rslt_sel    <=
@@ -79,7 +79,7 @@ always @(posedge clk) begin
     opcode==`INST_R && funct==`FUNCT_NOR      ? SEL_NOR :
     opcode==`INST_R && funct==`FUNCT_SLL      ? SEL_SLL :
     opcode==`INST_R && funct==`FUNCT_SRL      ? SEL_SRL :
-    opcode==`INST_R && funct==`FUNCT_SRA      ? SEL_SRA :
+//  opcode==`INST_R && funct==`FUNCT_SRA      ? SEL_SRA :
 //  opcode==`INST_R && funct==`FUNCT_SLLV     ? SEL_SLL :
 //  opcode==`INST_R && funct==`FUNCT_SRLV     ? SEL_SRL :
 //  opcode==`INST_R && funct==`FUNCT_SRAV     ? SEL_SRA :
@@ -98,7 +98,7 @@ assign  rslt =
   rslt_sel==SEL_NOR   ? ~rslt_or :
   rslt_sel==SEL_SLL   ? rslt_sll :
   rslt_sel==SEL_SRL   ? rslt_srl :
-  rslt_sel==SEL_SRA   ? rslt_sra :
+//rslt_sel==SEL_SRA   ? rslt_sra :
   rslt_sel==SEL_SLT   ? rslt_slt :
   rslt_sel==SEL_SLTU  ? rslt_sltu:
                         32'hXXXX;
