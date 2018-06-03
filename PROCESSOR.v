@@ -14,8 +14,8 @@ reg [32-1:0]  pc[IF:WB],  pc4[ID:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
 reg [ 6-1:0]  opcode[ID:WB], funct[ID:WB];
 reg [ 5-1:0]  rs[ID:WB],  rt[ID:WB],  rd[ID:WB];
 reg [ 5-1:0]  shamt[ID:WB];
-reg [16-1:0]  immi[ID:WB];  // immediate for I format
-reg [26-1:0]  immj[ID:WB];  // immediate for J format
+reg [16-1:0]  immi[EX:WB];  // immediate for I format
+reg [26-1:0]  immj[EX:WB];  // immediate for J format
 reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB], ldd[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
@@ -35,8 +35,8 @@ always @(posedge clk) begin
   for (i = EX; i <= WB; i = i + 1)  rt[i]     <= rst ? 0 : rt[i-1];
   for (i = MM; i <= WB; i = i + 1)  rd[i]     <= rst ? 0 : rd[i-1];
   for (i = EX; i <= WB; i = i + 1)  shamt[i]  <= rst ? 0 : shamt[i-1];
-  for (i = EX; i <= WB; i = i + 1)  immi[i]   <= rst ? 0 : immi[i-1];
-  for (i = EX; i <= WB; i = i + 1)  immj[i]   <= rst ? 0 : immj[i-1];
+  for (i = MM; i <= WB; i = i + 1)  immi[i]   <= rst ? 0 : immi[i-1];
+  for (i = MM; i <= WB; i = i + 1)  immj[i]   <= rst ? 0 : immj[i-1];
   for (i = WB; i <= WB; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
   for (i = WB; i <= WB; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
 //for (i = WB; i <= WB; i = i + 1)  ldd[i]    <= rst ? 0 : ldd[i-1];
@@ -72,10 +72,6 @@ always @(posedge clk) begin
   pc4[ID]   <= pc[IF]+4;
   // R format
   {opcode[ID], rs[ID], rt[ID], rd[ID], shamt[ID], funct[ID]} <= ir;
-  // I format
-  immi[ID]  <= ir[16-1:0];
-  // J format
-  immj[ID]  <= ir[26-1:0];
 
   // Invalidate instruction on failing branch prediction.
   valid[ID] <= !bmiss_wb;
@@ -127,6 +123,10 @@ always @(posedge clk) begin
     rst                                     ? 0         : // $0
     rt[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
                                               w_rrt;
+  // I format
+  immi[EX]  <= {                rd[ID], shamt[ID], funct[ID]};
+  // J format
+  immj[EX]  <= {rs[ID], rt[ID], rd[ID], shamt[ID], funct[ID]};
   // Fix register dstination if opcode was not R format.
   rd[EX] <= opcode[ID]==`INST_R ? rd[ID] : rt[ID];
   // reg/mem read/write flag.

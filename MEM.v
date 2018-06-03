@@ -15,6 +15,7 @@ module MEM #(
 );
 
 localparam  ADDR_WIDTH = `LOG2(WORD);
+(* ram_style = "block" *)
 reg [WIDTH-1:0]   mem[0:WORD-1];
 
 always @(posedge clk) begin
