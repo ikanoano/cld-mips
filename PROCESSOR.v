@@ -16,7 +16,7 @@ reg [ 5-1:0]  rs[ID:WB],  rt[ID:WB],  rd[ID:WB];
 reg [ 5-1:0]  shamt[ID:WB];
 reg [16-1:0]  immi[ID:WB];  // immediate for I format
 reg [26-1:0]  immj[ID:WB];  // immediate for J format
-reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[MM:WB], ldd[WB:WB];
+reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB], ldd[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[ID:WB];
@@ -35,9 +35,8 @@ always @(posedge clk) begin
   for (i = EX; i <= WB; i = i + 1)  shamt[i]  <= rst ? 0 : shamt[i-1];
   for (i = EX; i <= WB; i = i + 1)  immi[i]   <= rst ? 0 : immi[i-1];
   for (i = EX; i <= WB; i = i + 1)  immj[i]   <= rst ? 0 : immj[i-1];
-  for (i = MM; i <= WB; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
-  for (i = MM; i <= WB; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
-  for (i = WB; i <= WB; i = i + 1)  rslt[i]   <= rst ? 0 : rslt[i-1];
+  for (i = WB; i <= WB; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
+  for (i = WB; i <= WB; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
 //for (i = WB; i <= WB; i = i + 1)  ldd[i]    <= rst ? 0 : ldd[i-1];
   for (i = MM; i <= WB; i = i + 1)  rwe[i]    <= rst ? 0 : valid[i-1]&rwe[i-1];
   for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : valid[i-1]&mld[i-1];
@@ -80,25 +79,24 @@ end
 
 // ID ------------------------------------------------------------
 wire[32-1:0]  w_rrs, w_rrt, w_rrd;
-// rslt[wb] is forwarded to w_rr[st] in GPR
+// w_rrd is forwarded to w_rr[st] in GPR
 GPR regfile (
   .clk(clk),    .rst(rst),
   .rs(rs[ID]),  .rt(rt[ID]),  .rrs(w_rrs),  .rrt(w_rrt),
   .rd(rd[WB]),  .rrd(w_rrd),  .we(rwe[WB])
 );
 
-wire[32-1:0]  w_rslt;
+wire[32-1:0]  rslt_mm;
 always @(posedge clk) begin
+  // 1st forwarding
   // rwe includes valid
   rrs[EX] <=
-    rs[ID]==0                             ? 0         : // $0
-    rs[ID]==rd[EX] && rwe[EX]             ? w_rslt    : // alu result
-    rs[ID]==rd[MM] && rwe[MM]             ? rslt[MM]  : // alu result in MM
+    rst || rs[ID]==0                      ? 0         : // $0
+    rs[ID]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
                                             w_rrs;
   rrt[EX] <=
-    rt[ID]==0                             ? 0         : // $0
-    rt[ID]==rd[EX] && rwe[EX]             ? w_rslt    : // alu result
-    rt[ID]==rd[MM] && rwe[MM]             ? rslt[MM]  : // alu result in MM
+    rst || rt[ID]==0                      ? 0         : // $0
+    rt[ID]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
                                             w_rrt;
   // Fix register dstination if opcode was not R format.
   rd[EX] <= opcode[ID]==`INST_R ? rd[ID] : rt[ID];
@@ -111,8 +109,7 @@ always @(posedge clk) begin
     opcode[ID]!=`INST_J_J;
     //&& !(opcode_ex==`INST_R && funct_ex==`FUNCT_JR);
 
-  if(((rs[ID]==rd[MM] || rt[ID]==rd[MM]) && mld[MM]) ||
-     ((rs[ID]==rd[EX] || rt[ID]==rd[EX]) && mld[EX])) begin
+  if((rs[ID]==rd[EX] || rt[ID]==rd[EX]) && mld[EX]) begin
     // needs data forwarding from memory && not ready
     $display("Not supported: kuso zako compiler");
     $finish();
@@ -136,14 +133,27 @@ end
 
 
 // EX ------------------------------------------------------------
+// 2nd forwarding
+wire[32-1:0]  rrs_fwd =
+    rs[EX]==0                             ? 0         : // $0
+    rs[EX]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
+    rs[EX]==rd[WB] && mld[WB]             ? ldd[WB]   : // memory data in WB
+                                            rrs[EX];
+wire[32-1:0]  rrt_fwd =
+    rt[EX]==0                             ? 0         : // $0
+    rt[EX]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result
+    rt[EX]==rd[WB] && mld[WB]             ? ldd[WB]   : // memory data in WB
+                                            rrt[EX];
 ALU alu (
   .clk(clk),  .rst(rst),
   .opcode(opcode[EX]),
-  .rrs(rrs[EX]),  .rrt_in(rrt[EX]),   .imm(immi[EX]),
+  .rrs(rrs_fwd),  .rrt_in(rrt_fwd),   .imm(immi[EX]),
   .funct(funct[EX]),  .shamt_in(shamt[EX]),
-  .rslt(w_rslt)
+  .rslt(rslt_mm)
 );
-always @(posedge clk) rslt[MM] <= w_rslt;
+
+always @(posedge clk) rrs[MM] <= rst ? 0 :rrs_fwd; // update
+always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
 
 assign  btaken = // branch condition
   //jal || jr ||
@@ -158,11 +168,12 @@ MEM #(
   .WIDTH(32),
   .WORD(4096)
 ) dmem (
-  .clk(clk),                  .rst(rst),
-  .addr({2'b0, rslt[MM][2+:30]}),
+  .clk(clk),    .rst(rst),
+  .addr({2'b0, rslt_mm[2+:30]}),
   .out(w_ldd),  .in(rrt[MM]), .we(mwe[MM])
 );
-always @(posedge clk) ldd[WB] <= w_ldd;
+always @(posedge clk) ldd[WB]   <= rst ? 0 : w_ldd;
+always @(posedge clk) rslt[WB]  <= rst ? 0 : rslt_mm;
 
 
 // WB ------------------------------------------------------------
@@ -170,7 +181,7 @@ assign  w_rrd  = mld[WB] ? ldd[WB] : rslt[WB];
 
 
 // misc ----------------------------------------------------------
-always @(posedge clk) led <= w_rslt;
+always @(posedge clk) led <= rslt[WB];
 integer j;
 always @(posedge clk) begin
   for (j = EX; j <= WB; j = j + 1) begin
