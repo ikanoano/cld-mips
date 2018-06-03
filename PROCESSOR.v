@@ -20,7 +20,8 @@ reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB], ldd[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[ID:WB];
-reg           btaken_mm=0;
+reg [33-1:0]  bpred[ID:WB], bact_mm=0; // {pred_taken (1bit), target_pc (32bit)}
+reg           bmiss_mm=0;
 
 integer i;
 always @(posedge clk) begin
@@ -42,15 +43,17 @@ always @(posedge clk) begin
   for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : valid[i-1]&mld[i-1];
   for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : valid[i-1]&mwe[i-1];
   for (i = MM; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
+  for (i = EX; i <= WB; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
 end
 
 // IF ------------------------------------------------------------
 wire[32-1:0]  pc4_if = pc[IF]+4;
 always @(posedge clk) begin
   pc[IF] <=
-    rst         ? 0         :
-    btaken_mm   ? btpc[MM]  :
-                  pc4_if;
+    rst           ? 0                 :
+    bmiss_mm      ? bact_mm[0+:32]    :
+    bpred[ID][32] ? bpred[ID][0+:32]  :
+                    pc4_if;
 end
 
 wire[32-1:0]  ir;
@@ -74,8 +77,30 @@ always @(posedge clk) begin
   immj[ID]  <= ir[26-1:0];
 
   // Invalidate instruction on failing branch prediction.
-  valid[ID] <= !btaken_mm;
-  valid[EX] <= !btaken_mm & valid[ID];
+  valid[ID] <= !bmiss_mm;
+  valid[EX] <= !bmiss_mm & valid[ID];
+end
+
+// TODO: add tag to use pc[3+:] , pc[4+:] instead of pc[2+:]
+localparam                      BTB_PC_WIDTH = 10;
+localparam[32-BTB_PC_WIDTH-1:0] BTB_DUMMYZERO= 0;
+wire          btb_valid;
+wire[32-1:0]  btb_target;
+MEM_2R1W #(
+  .WIDTH(1+32), // valid + PC
+  .WORD(2**BTB_PC_WIDTH)
+) btb (
+  .clk(clk),  .rst(rst),
+  .addr0({BTB_DUMMYZERO, pc[MM][2+:BTB_PC_WIDTH]}),
+  .in0(bact_mm),
+  .we0(1'b1),
+  .out0(),
+// HACK: 2+:BTB_PC_WIDTH assumes consecutive branch instruction. 4 is also OK.
+  .addr1({BTB_DUMMYZERO, pc[IF][2+:BTB_PC_WIDTH]}),
+  .out1({btb_valid, btb_target})
+);
+always @(posedge clk) begin
+  bpred[ID] <= {btb_valid, btb_target};
 end
 
 
@@ -156,11 +181,25 @@ ALU alu (
 
 always @(posedge clk) rrs[MM] <= rst ? 0 :rrs_fwd; // update
 always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
-always @(posedge clk) btaken_mm  <= // branch condition
+
+// Check branch prediction
+wire btaken = // Is actual condition taken?
   //jal || jr ||
   opj                         ||
   (opbeq && rrs_fwd==rrt_fwd) ||
   (opbne && rrs_fwd!=rrt_fwd);
+always @(posedge clk) begin
+  if(rst) begin
+    bmiss_mm  <= 0;
+  end else if(bpred[EX][32]) begin
+    // pred was taken
+    bmiss_mm  <= valid[EX] && (!btaken || btpc[EX]!=bpred[EX][0+:32]);
+  end else begin
+    // pred was untaken
+    bmiss_mm  <= valid[EX] && (btaken);
+  end
+  bact_mm <= rst ? 0 : {btaken, btaken ? btpc[EX] : pc4[EX]};
+end
 
 always @(posedge clk) begin
   if(((rs[EX]==rd[MM] || rt[EX]==rd[MM]) && mld[MM] && valid[MM]) ||
