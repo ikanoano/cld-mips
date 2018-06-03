@@ -10,6 +10,7 @@ module ALU (
   input   wire[32-1:0]  rrs,
   input   wire[32-1:0]  rrt_in,
   input   wire[16-1:0]  imm,
+  input   wire[ 6-1:0]  funct_fwd,
   input   wire[ 6-1:0]  funct,
   input   wire[ 5-1:0]  shamt_in,
   output  wire[32-1:0]  rslt
@@ -28,6 +29,22 @@ always @(posedge clk) rrt_sel <=
   opcode_fwd==`INST_I_ORI   ||
   opcode_fwd==`INST_I_XORI  ? RRT_IMMZ  :
                               RRT_IMMS;
+
+localparam[2-1:0]
+  LOGI_AND=  0,
+  LOGI_OR =  1,
+  LOGI_XOR=  2,
+  LOGI_NOR=  3;
+reg [2-1:0] logi_sel=0;
+always @(posedge clk) logi_sel <=
+  opcode_fwd==`INST_I_ANDI                  ||
+  opcode_fwd==`INST_R && funct_fwd==`FUNCT_AND  ? LOGI_AND  :
+  opcode_fwd==`INST_I_ORI                   ||
+  opcode_fwd==`INST_R && funct_fwd==`FUNCT_OR   ? LOGI_OR   :
+  opcode_fwd==`INST_I_XORI                  ||
+  opcode_fwd==`INST_R && funct_fwd==`FUNCT_XOR  ? LOGI_XOR  :
+  opcode_fwd==`INST_R && funct_fwd==`FUNCT_NOR  ? LOGI_NOR  :
+                                                  2'hX;
 
 localparam[3-1:0]
   SEL_LOGI=  0,
@@ -49,16 +66,13 @@ reg [32-1:0]  rslt_add, rslt_sub, rslt_logi,
 wire[ 3-1:0]  shamt = shamt_in[0+:3];
 reg [ 3-1:0]  rslt_sel=0;
 always @(posedge clk) begin
-  rslt_logi   <=
-    rst                                       ?   0         :
-    opcode==`INST_I_ANDI                  ||
-    opcode==`INST_R && funct==`FUNCT_AND      ?   rrs & rrt :
-    opcode==`INST_I_ORI                   ||
-    opcode==`INST_R && funct==`FUNCT_OR       ?   rrs | rrt :
-    opcode==`INST_I_XORI                  ||
-    opcode==`INST_R && funct==`FUNCT_XOR      ?   rrs ^ rrt :
-    opcode==`INST_R && funct==`FUNCT_NOR      ? ~(rrs | rrt):
-                                                  32'hXXXX;
+  rslt_logi <=
+    rst                 ?   0         :
+    logi_sel==LOGI_AND  ?   rrs & rrt :
+    logi_sel==LOGI_OR   ?   rrs | rrt :
+    logi_sel==LOGI_XOR  ?   rrs ^ rrt :
+    logi_sel==LOGI_NOR  ? ~(rrs | rrt):
+                            32'hXXXX;
 
   rslt_add    <= rst ? 0 : rrs + rrt;
   rslt_sub    <= rst ? 0 : rrs - rrt_in;
