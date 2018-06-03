@@ -5,6 +5,7 @@
 module ALU (
   input   wire          clk,
   input   wire          rst,
+  input   wire[ 6-1:0]  opcode_fwd,
   input   wire[ 6-1:0]  opcode,
   input   wire[32-1:0]  rrs,
   input   wire[32-1:0]  rrt_in,
@@ -14,23 +15,33 @@ module ALU (
   output  wire[32-1:0]  rslt
 );
 
+localparam[2-1:0]
+  RRT_RRT =  0,
+  RRT_IMMZ=  2,
+  RRT_IMMS=  3;
+reg [2-1:0] rrt_sel=0;
+always @(posedge clk) rrt_sel <=
+  opcode_fwd==`INST_R       ? RRT_RRT   :
+//opcode_fwd==`INST_I_LB    ||
+//opcode_fwd==`INST_I_LH    ||
+  opcode_fwd==`INST_I_ANDI  ||
+  opcode_fwd==`INST_I_ORI   ||
+  opcode_fwd==`INST_I_XORI  ? RRT_IMMZ  :
+                              RRT_IMMS;
+
 localparam[3-1:0]
   SEL_LOGI=  0,
   SEL_ADD =  1,
   SEL_SLL =  2,
   SEL_SRL =  3,
   SEL_SLT =  4;
-
 wire[32-1:0]  imm_s     = {{16{imm[15]}}, imm};
 wire[32-1:0]  imm_z     = {{16{   1'b0}}, imm};
 wire[32-1:0]  rrt       =
-  opcode==`INST_R     ? rrt_in :
-//opcode==`INST_I_LB    ||
-//opcode==`INST_I_LH    ||
-  opcode==`INST_I_ANDI  ||
-  opcode==`INST_I_ORI   ||
-  opcode==`INST_I_XORI  ? imm_z :
-                          imm_s;
+  rrt_sel==RRT_RRT  ? rrt_in  :
+  rrt_sel==RRT_IMMZ ? imm_z   :
+  rrt_sel==RRT_IMMS ? imm_s   :
+                      32'hXXXX;
 
 reg [32-1:0]  rslt_add, rslt_sub, rslt_logi,
               rslt_sll, rslt_srl, rslt_sra, rslt_slt, rslt_sltu;

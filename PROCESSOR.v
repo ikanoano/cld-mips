@@ -157,6 +157,7 @@ wire[32-1:0]  rrt_fwd =
                             rrt[EX];
 ALU alu (
   .clk(clk),  .rst(rst),
+  .opcode_fwd(opcode[ID]),
   .opcode(opcode[EX]),
   .rrs(rrs_fwd),  .rrt_in(rrt_fwd),   .imm(immi[EX]),
   .funct(funct[EX]),  .shamt_in(shamt[EX]),
