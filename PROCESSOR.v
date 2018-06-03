@@ -154,9 +154,9 @@ always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
 
 assign  btaken = // branch condition
   //jal || jr ||
-  opcode[EX]==`INST_J_J                       ||
-  opcode[EX]==`INST_I_BEQ && rrs[EX]==rrt[EX] ||
-  opcode[EX]==`INST_I_BNE && rrs[EX]!=rrt[EX];
+  opcode[EX]==`INST_J_J                               ||
+  opcode[EX]==`INST_I_BEQ && rrs_fwd[EX]==rrt_fwd[EX] ||
+  opcode[EX]==`INST_I_BNE && rrs_fwd[EX]!=rrt_fwd[EX];
 
 
 // MM ------------------------------------------------------------
