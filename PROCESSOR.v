@@ -20,7 +20,7 @@ reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB], ldd[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[ID:WB];
-wire          btaken;
+reg           btaken_mm=0;
 
 integer i;
 always @(posedge clk) begin
@@ -41,7 +41,7 @@ always @(posedge clk) begin
   for (i = MM; i <= WB; i = i + 1)  rwe[i]    <= rst ? 0 : valid[i-1]&rwe[i-1];
   for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : valid[i-1]&mld[i-1];
   for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : valid[i-1]&mwe[i-1];
-  for (i = EX; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
+  for (i = MM; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
 end
 
 // IF ------------------------------------------------------------
@@ -49,7 +49,7 @@ wire[32-1:0]  pc4_if = pc[IF]+4;
 always @(posedge clk) begin
   pc[IF] <=
     rst         ? 0         :
-    btaken      ? btpc[EX]  :
+    btaken_mm   ? btpc[MM]  :
                   pc4_if;
 end
 
@@ -74,7 +74,8 @@ always @(posedge clk) begin
   immj[ID]  <= ir[26-1:0];
 
   // Invalidate instruction on failing branch prediction.
-  valid[ID] <= !btaken;
+  valid[ID] <= !btaken_mm;
+  valid[EX] <= !btaken_mm & valid[ID];
 end
 
 
@@ -84,38 +85,33 @@ wire[32-1:0]  w_rrs, w_rrt, w_rrd;
 GPR regfile (
   .clk(clk),    .rst(rst),
   .rs(rs[ID]),  .rt(rt[ID]),  .rrs(w_rrs),  .rrt(w_rrt),
-  .rd(rd[WB]),  .rrd(w_rrd),  .we(rwe[WB])
+  .rd(rd[WB]),  .rrd(w_rrd),  .we(rwe[WB]&&valid[WB])
 );
 
 wire[32-1:0]  rslt_mm;
 always @(posedge clk) begin
   // 1st forwarding
-  // rwe includes valid && rd!=0
+  // rwe includes rd!=0
   rrs[EX] <=
-    rst                                   ? 0         : // $0
-    rs[ID]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
-                                            w_rrs;
+    rst                                     ? 0         : // $0
+    rs[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
+                                              w_rrs;
   rrt[EX] <=
-    rst                                   ? 0         : // $0
-    rt[ID]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
-                                            w_rrt;
+    rst                                     ? 0         : // $0
+    rt[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
+                                              w_rrt;
   // Fix register dstination if opcode was not R format.
   rd[EX] <= opcode[ID]==`INST_R ? rd[ID] : rt[ID];
-  mld[EX]<= valid[ID] && opcode[ID]==`INST_I_LW;
-  mwe[EX]<= valid[ID] && opcode[ID]==`INST_I_SW;
-  rwe[EX]<= valid[ID] && (opcode[ID]==`INST_R ? rd[ID]!=0 : rt[ID]!=0) &&
+  // reg/mem read/write flag.
+  mld[EX]<= opcode[ID]==`INST_I_LW;
+  mwe[EX]<= opcode[ID]==`INST_I_SW;
+  rwe[EX]<= (opcode[ID]==`INST_R ? rd[ID]!=0 : rt[ID]!=0) &&
     opcode[ID]!=`INST_I_BEQ  &&
     opcode[ID]!=`INST_I_BNE  &&
     opcode[ID]!=`INST_I_SW   &&
     opcode[ID]!=`INST_J_J;
     //&& !(opcode_ex==`INST_R && funct_ex==`FUNCT_JR);
 
-  if(((rs[ID]==rd[EX] || rt[ID]==rd[EX]) && mld[EX]) ||
-     ((rs[ID]==rd[MM] || rt[ID]==rd[MM]) && mld[EX])) begin
-    // needs data forwarding from memory && not ready
-    $display("Not supported: kuso zako compiler");
-    $finish();
-  end
 end
 
 wire[32-1:0]  branch_addr = {{14{immi[ID][15]}}, immi[ID], 2'b0} + pc4[ID];
@@ -145,11 +141,11 @@ always @(posedge clk) rtrd <= rt[ID]==rd[EX];
 // 2nd forwarding
 
 wire[32-1:0]  rrs_fwd =
-    rsrd && rwe[MM] /*&& ~mld[MM]*/ ? rslt_mm   : // alu result in MM
-                                      rrs[EX];
+    rsrd && rwe[MM] && valid[MM]/*&&~mld[MM]*/? rslt_mm   : // alu result in MM
+                                                rrs[EX];
 wire[32-1:0]  rrt_fwd =
-    rtrd && rwe[MM] /*&& ~mld[MM]*/ ? rslt_mm   : // alu result
-                                      rrt[EX];
+    rtrd && rwe[MM] && valid[MM]/*&&~mld[MM]*/? rslt_mm   : // alu result
+                                                rrt[EX];
 ALU alu (
   .clk(clk),  .rst(rst),
   .opcode(opcode[EX]),
@@ -160,13 +156,20 @@ ALU alu (
 
 always @(posedge clk) rrs[MM] <= rst ? 0 :rrs_fwd; // update
 always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
-
-assign  btaken = // branch condition
+always @(posedge clk) btaken_mm  <= // branch condition
   //jal || jr ||
   opj                         ||
   (opbeq && rrs_fwd==rrt_fwd) ||
   (opbne && rrs_fwd!=rrt_fwd);
 
+always @(posedge clk) begin
+  if(((rs[EX]==rd[MM] || rt[EX]==rd[MM]) && mld[MM] && valid[MM]) ||
+     ((rs[EX]==rd[WB] || rt[EX]==rd[WB]) && mld[WB] && valid[WB])) begin
+    // needs data forwarding from memory && not ready
+    $display("Not supported: kuso zako compiler");
+    $finish();
+  end
+end
 
 // MM ------------------------------------------------------------
 wire[32-1:0]  w_ldd;
@@ -176,7 +179,7 @@ MEM #(
 ) dmem (
   .clk(clk),    .rst(rst),
   .addr({2'b0, rslt_mm[2+:30]}),
-  .out(w_ldd),  .in(rrt[MM]), .we(mwe[MM])
+  .out(w_ldd),  .in(rrt[MM]), .we(mwe[MM]&&valid[MM])
 );
 always @(posedge clk) ldd[WB]   <= rst ? 0 : w_ldd;
 always @(posedge clk) rslt[WB]  <= rst ? 0 : rslt_mm;
@@ -188,14 +191,6 @@ assign  w_rrd  = mld[WB] ? ldd[WB] : rslt[WB];
 
 // misc ----------------------------------------------------------
 always @(posedge clk) led <= rslt[WB];
-integer j;
-always @(posedge clk) begin
-  for (j = EX; j <= WB; j = j + 1) begin
-    if(!rst && rwe[j] && !valid[j]) $display("assertion failed: rwe");
-    if(!rst && mld[j] && !valid[j]) $display("assertion failed: mld");
-    if(!rst && mwe[j] && !valid[j]) $display("assertion failed: mwe");
-  end
-end
 
 endmodule
 
