@@ -89,20 +89,20 @@ GPR regfile (
 wire[32-1:0]  rslt_mm;
 always @(posedge clk) begin
   // 1st forwarding
-  // rwe includes valid
+  // rwe includes valid && rd!=0
   rrs[EX] <=
-    rst || rs[ID]==0                      ? 0         : // $0
+    rst                                   ? 0         : // $0
     rs[ID]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
                                             w_rrs;
   rrt[EX] <=
-    rst || rt[ID]==0                      ? 0         : // $0
+    rst                                   ? 0         : // $0
     rt[ID]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
                                             w_rrt;
   // Fix register dstination if opcode was not R format.
   rd[EX] <= opcode[ID]==`INST_R ? rd[ID] : rt[ID];
   mld[EX]<= valid[ID] && opcode[ID]==`INST_I_LW;
   mwe[EX]<= valid[ID] && opcode[ID]==`INST_I_SW;
-  rwe[EX]<= valid[ID] &&
+  rwe[EX]<= valid[ID] && (opcode[ID]==`INST_R ? rd[ID]!=0 : rt[ID]!=0) &&
     opcode[ID]!=`INST_I_BEQ  &&
     opcode[ID]!=`INST_I_BNE  &&
     opcode[ID]!=`INST_I_SW   &&
@@ -136,11 +136,9 @@ end
 // EX ------------------------------------------------------------
 // 2nd forwarding
 wire[32-1:0]  rrs_fwd =
-    rs[EX]==0                             ? 0         : // $0
     rs[EX]==rd[MM] && rwe[MM] /*~mld[MM]*/? rslt_mm   : // alu result in MM
                                             rrs[EX];
 wire[32-1:0]  rrt_fwd =
-    rt[EX]==0                             ? 0         : // $0
     rt[EX]==rd[MM] && rwe[MM] /*~mld[MM]*/? rslt_mm   : // alu result
                                             rrt[EX];
 ALU alu (
