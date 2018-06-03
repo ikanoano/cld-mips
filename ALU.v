@@ -41,6 +41,7 @@ wire[32-1:0]  rrt       =
 reg [32-1:0]  rslt_add, rslt_sub, rslt_and, rslt_or, rslt_xor,
               rslt_sll, rslt_srl, rslt_sra, rslt_slt, rslt_sltu;
 
+wire[ 3-1:0]  shamt = shamt_in[0+:3];
 reg [ 4-1:0]  rslt_sel=0;
 always @(posedge clk) begin
   rslt_add    <= rst ? 0 : rrs + rrt;
@@ -48,8 +49,8 @@ always @(posedge clk) begin
   rslt_and    <= rst ? 0 : rrs & rrt;
   rslt_or     <= rst ? 0 : rrs | rrt;
   rslt_xor    <= rst ? 0 : rrs ^ rrt;
-  rslt_sll    <= rst ? 0 : rrt << shamt_in;
-  rslt_srl    <= rst ? 0 : rrt >> shamt_in;
+  rslt_sll    <= rst ? 0 : rrt << shamt;
+  rslt_srl    <= rst ? 0 : rrt >> shamt;
 //rslt_sra    <= rst ? 0 : $signed(rrt) >>> shamt_in;
   rslt_slt    <= rst ? 0 : $signed(rrs) < $signed(rrt) ? 32'b1 : 32'b0;
   rslt_sltu   <= rst ? 0 :         rrs  <         rrt  ? 32'b1 : 32'b0;
@@ -102,5 +103,14 @@ assign  rslt =
   rslt_sel==SEL_SLT   ? rslt_slt :
   rslt_sel==SEL_SLTU  ? rslt_sltu:
                         32'hXXXX;
+
+reg [5-1:0] last_shamt=0;
+always @(posedge clk) begin
+  last_shamt <= shamt_in;
+  if((rslt_sel==SEL_SLL||rslt_sel==SEL_SRL) && last_shamt[4:3]!=0) begin
+    $display("Not suported: shamt >= 8 .");
+    $finish();
+  end
+end
 
 endmodule
