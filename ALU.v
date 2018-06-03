@@ -61,12 +61,13 @@ always @(posedge clk) begin
                                                   32'hXXXX;
 
   rslt_add    <= rst ? 0 : rrs + rrt;
-  rslt_sub    <= rst ? 0 : rrs - rrt;
-  rslt_sll    <= rst ? 0 : rrt << shamt;
-  rslt_srl    <= rst ? 0 : rrt >> shamt;
-//rslt_sra    <= rst ? 0 : $signed(rrt) >>> shamt_in;
-  rslt_slt    <= rst ? 0 : $signed(rrs) < $signed(rrt) ? 32'b1 : 32'b0;
-  rslt_sltu   <= rst ? 0 :         rrs  <         rrt  ? 32'b1 : 32'b0;
+  rslt_sub    <= rst ? 0 : rrs - rrt_in;
+  rslt_sll    <= rst ? 0 : rrt_in << shamt;
+  rslt_srl    <= rst ? 0 : rrt_in >> shamt;
+//rslt_sra    <= rst ? 0 : $signed(rrt_in) >>> shamt_in;
+  // NOTE: "rrt_in" in slt(u) should be "rrt" if slti or sltu exists.
+  rslt_slt    <= rst ? 0 : $signed(rrs) < $signed(rrt_in) ? 32'b1 : 32'b0;
+  rslt_sltu   <= rst ? 0 :         rrs  <         rrt_in  ? 32'b1 : 32'b0;
   rslt_sel    <=
     opcode==`INST_I_ADDI  ||
     opcode==`INST_I_ADDIU                     ? SEL_ADD :
