@@ -109,7 +109,8 @@ always @(posedge clk) begin
     opcode[ID]!=`INST_J_J;
     //&& !(opcode_ex==`INST_R && funct_ex==`FUNCT_JR);
 
-  if((rs[ID]==rd[EX] || rt[ID]==rd[EX]) && mld[EX]) begin
+  if(((rs[ID]==rd[EX] || rt[ID]==rd[EX]) && mld[EX]) ||
+     ((rs[ID]==rd[MM] || rt[ID]==rd[MM]) && mld[EX])) begin
     // needs data forwarding from memory && not ready
     $display("Not supported: kuso zako compiler");
     $finish();
@@ -136,13 +137,11 @@ end
 // 2nd forwarding
 wire[32-1:0]  rrs_fwd =
     rs[EX]==0                             ? 0         : // $0
-    rs[EX]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result in MM
-    rs[EX]==rd[WB] && mld[WB]             ? ldd[WB]   : // memory data in WB
+    rs[EX]==rd[MM] && rwe[MM] /*~mld[MM]*/? rslt_mm   : // alu result in MM
                                             rrs[EX];
 wire[32-1:0]  rrt_fwd =
     rt[EX]==0                             ? 0         : // $0
-    rt[EX]==rd[MM] && rwe[MM]             ? rslt_mm   : // alu result
-    rt[EX]==rd[WB] && mld[WB]             ? ldd[WB]   : // memory data in WB
+    rt[EX]==rd[MM] && rwe[MM] /*~mld[MM]*/? rslt_mm   : // alu result
                                             rrt[EX];
 ALU alu (
   .clk(clk),  .rst(rst),
