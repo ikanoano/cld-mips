@@ -93,7 +93,7 @@ MEM_2R1W #(
   .clk(clk),  .rst(rst),
   .addr0({BTB_DUMMYZERO, pc[MM][2+:BTB_PC_WIDTH]}),
   .in0(bact_mm),
-  .we0(1'b1),
+  .we0(bmiss_mm),
   .out0(),
 // HACK: 2+:BTB_PC_WIDTH assumes consecutive branch instruction. 4 is also OK.
   .addr1({BTB_DUMMYZERO, pc[IF][2+:BTB_PC_WIDTH]}),
