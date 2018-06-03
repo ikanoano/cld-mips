@@ -18,15 +18,15 @@ wire[32-1:0]  imm_s     = {{16{imm[15]}}, imm};
 wire[32-1:0]  imm_z     = {{16{   1'b0}}, imm};
 wire[32-1:0]  rrt       =
   opcode==`INST_R     ? rrt_in :
+//opcode==`INST_I_LB    ||
+//opcode==`INST_I_LH    ||
   opcode==`INST_I_ANDI  ||
   opcode==`INST_I_ORI   ||
-  opcode==`INST_I_XORI  ||
-  opcode==`INST_I_LB    ||
-  opcode==`INST_I_LH  ? imm_z :
-                        imm_s;
+  opcode==`INST_I_XORI  ? imm_z :
+                          imm_s;
 wire[ 5-1:0]  shamt     = funct[2] ? rrs[4:0] : shamt_in;
 
-reg [32-1:0]  rslt_add, rslt_sub, rslt_and, rslt_or, rslt_xor, rslt_nor,
+reg [32-1:0]  rslt_add, rslt_sub, rslt_and, rslt_or, rslt_xor,
               rslt_sll, rslt_srl, rslt_sra, rslt_slt, rslt_sltu;
 
 reg [ 6-1:0]  r_opcode=0, r_funct=0;
@@ -38,7 +38,6 @@ always @(posedge clk) begin
   rslt_and    <= rst ? 0 : rrs & rrt;
   rslt_or     <= rst ? 0 : rrs | rrt;
   rslt_xor    <= rst ? 0 : rrs ^ rrt;
-  rslt_nor    <= rst ? 0 : ~(rrs | rrt);
   rslt_sll    <= rst ? 0 : rrt << shamt;
   rslt_srl    <= rst ? 0 : rrt >> shamt;
   rslt_sra    <= rst ? 0 : $signed(rrt) >>>shamt;
@@ -54,10 +53,10 @@ assign  rslt =
   r_opcode==`INST_I_XORI                        ? rslt_xor :
   r_opcode==`INST_I_SLTI                        ? rslt_slt :
   r_opcode==`INST_I_SLTIU                       ? rslt_sltu:
-  r_opcode==`INST_I_LB    ||
-  r_opcode==`INST_I_LH    ||
-  r_opcode==`INST_I_LBU   ||
-  r_opcode==`INST_I_LHU   ||
+//r_opcode==`INST_I_LB    ||
+//r_opcode==`INST_I_LH    ||
+//r_opcode==`INST_I_LBU   ||
+//r_opcode==`INST_I_LHU   ||
   r_opcode==`INST_I_LW    ||
 //r_opcode==`INST_I_SB    ||
 //r_opcode==`INST_I_SH    ||
@@ -69,7 +68,7 @@ assign  rslt =
   r_opcode==`INST_R && r_funct==`FUNCT_AND      ? rslt_and :
   r_opcode==`INST_R && r_funct==`FUNCT_OR       ? rslt_or  :
   r_opcode==`INST_R && r_funct==`FUNCT_XOR      ? rslt_xor :
-  r_opcode==`INST_R && r_funct==`FUNCT_NOR      ? rslt_nor :
+  r_opcode==`INST_R && r_funct==`FUNCT_NOR      ?~rslt_or  :
   r_opcode==`INST_R && r_funct==`FUNCT_SLL      ? rslt_sll :
   r_opcode==`INST_R && r_funct==`FUNCT_SRL      ? rslt_srl :
   r_opcode==`INST_R && r_funct==`FUNCT_SRA      ? rslt_sra :

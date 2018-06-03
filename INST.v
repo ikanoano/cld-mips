@@ -15,10 +15,10 @@
 `define INST_J_J        6'h02
 //`define INST_J_JAL      6'h03
 
-`define INST_I_LB       6'h20
-`define INST_I_LH       6'h21
-`define INST_I_LBU      6'h24
-`define INST_I_LHU      6'h25
+//`define INST_I_LB       6'h20
+//`define INST_I_LH       6'h21
+//`define INST_I_LBU      6'h24
+//`define INST_I_LHU      6'h25
 //`define INST_I_LUI      6'h0f
 `define INST_I_LW       6'h23
 
