@@ -10,7 +10,7 @@ module PROCESSOR (
 
 localparam IF = 0, ID = 1, EX = 2, MM = 3, WB = 4;
 
-reg [32-1:0]  pc[IF:WB],  pc4[ID:WB], btpc[EX:WB]; // pc, pc+4, branch target pc
+reg [32-1:0]  pc[IF:WB],  pc4[ID:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
 reg [ 6-1:0]  opcode[ID:WB], funct[ID:WB];
 reg [ 5-1:0]  rs[ID:WB],  rt[ID:WB],  rd[ID:WB];
 reg [ 5-1:0]  shamt[ID:WB];
@@ -20,14 +20,15 @@ reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB], ldd[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[ID:WB];
-reg [33-1:0]  bpred[ID:WB], bact_mm=0; // {pred_taken (1bit), target_pc (32bit)}
-reg           bmiss_mm=0;
+reg [33-1:0]  bpred[ID:WB]; // {pred_taken (1bit), target_pc (32bit)}
+wire[33-1:0]  bact_wb;      // actual branch condition
+reg           bmiss_wb;
 
 integer i;
 always @(posedge clk) begin
   for (i = EX; i <= WB; i = i + 1)  pc[i]     <= rst ? 0 : pc[i-1];
   for (i = EX; i <= WB; i = i + 1)  pc4[i]    <= rst ? 0 : pc4[i-1];
-  for (i = MM; i <= WB; i = i + 1)  btpc[i]   <= rst ? 0 : btpc[i-1];
+  for (i = WB; i <= WB; i = i + 1)  btpc[i]   <= rst ? 0 : btpc[i-1];
   for (i = EX; i <= WB; i = i + 1)  opcode[i] <= rst ? 0 : opcode[i-1];
   for (i = EX; i <= WB; i = i + 1)  funct[i]  <= rst ? 0 : funct[i-1];
   for (i = EX; i <= WB; i = i + 1)  rs[i]     <= rst ? 0 : rs[i-1];
@@ -42,7 +43,7 @@ always @(posedge clk) begin
   for (i = MM; i <= WB; i = i + 1)  rwe[i]    <= rst ? 0 : valid[i-1]&rwe[i-1];
   for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : valid[i-1]&mld[i-1];
   for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : valid[i-1]&mwe[i-1];
-  for (i = MM; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
+  for (i = WB; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
   for (i = EX; i <= WB; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
 end
 
@@ -51,7 +52,7 @@ wire[32-1:0]  pc4_if = pc[IF]+4;
 always @(posedge clk) begin
   pc[IF] <=
     rst           ? 0                 :
-    bmiss_mm      ? bact_mm[0+:32]    :
+    bmiss_wb      ? bact_wb[0+:32]    :
     bpred[ID][32] ? bpred[ID][0+:32]  :
                     pc4_if;
 end
@@ -77,8 +78,9 @@ always @(posedge clk) begin
   immj[ID]  <= ir[26-1:0];
 
   // Invalidate instruction on failing branch prediction.
-  valid[ID] <= !bmiss_mm;
-  valid[EX] <= !bmiss_mm & valid[ID];
+  valid[ID] <= !bmiss_wb;
+  valid[EX] <= !bmiss_wb & valid[ID];
+  valid[MM] <= !bmiss_wb & valid[EX];
 end
 
 // TODO: add tag to use pc[3+:] , pc[4+:] instead of pc[2+:]
@@ -91,9 +93,9 @@ MEM_2R1W #(
   .WORD(2**BTB_PC_WIDTH)
 ) btb (
   .clk(clk),  .rst(rst),
-  .addr0({BTB_DUMMYZERO, pc[MM][2+:BTB_PC_WIDTH]}),
-  .in0(bact_mm),
-  .we0(bmiss_mm),
+  .addr0({BTB_DUMMYZERO, pc[WB][2+:BTB_PC_WIDTH]}),
+  .in0(bact_wb),
+  .we0(bmiss_wb),
   .out0(),
 // HACK: 2+:BTB_PC_WIDTH assumes consecutive branch instruction. 4 is also OK.
   .addr1({BTB_DUMMYZERO, pc[IF][2+:BTB_PC_WIDTH]}),
@@ -139,25 +141,6 @@ always @(posedge clk) begin
 
 end
 
-wire[32-1:0]  branch_addr = {{14{immi[ID][15]}}, immi[ID], 2'b0} + pc4[ID];
-wire[32-1:0]  jump_addr   = {pc[ID][31:28],      immj[ID], 2'b0};
-//assign      jal =   //jump and link
-//  opcode[ID] == `INST_J_JAL ||
-// (opcode[ID] == `INST_R && funct[ID] == `FUNCT_JALR);
-//assign      jr  =   //jump register
-//  opcode[ID] == `INST_R && (funct[ID] == `FUNCT_JR || funct[ID] == `FUNCT_JALR);
-reg   opj=0, opbeq=0, opbne=0;
-always @(posedge clk) begin
-  btpc[EX] <=  // branch target
-    //opcode[ID]==`INST_J_JAL ||
-    opcode[ID]==`INST_J_J   ? jump_addr   :
-    //jr                      ? rrs_fwd_ex  :
-                              branch_addr;
-  opj   <= opcode[ID]==`INST_J_J    && valid[ID];
-  opbeq <= opcode[ID]==`INST_I_BEQ  && valid[ID];
-  opbne <= opcode[ID]==`INST_I_BNE  && valid[ID];
-end
-
 // comparing r[st]==rd for 2nd forwarding
 reg rsrd=0, rtrd=0;
 always @(posedge clk) rsrd <= rs[ID]==rd[EX];
@@ -182,23 +165,23 @@ ALU alu (
 always @(posedge clk) rrs[MM] <= rst ? 0 :rrs_fwd; // update
 always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
 
-// Check branch prediction
-wire btaken = // Is actual condition taken?
-  //jal || jr ||
-  opj                         ||
-  (opbeq && rrs_fwd==rrt_fwd) ||
-  (opbne && rrs_fwd!=rrt_fwd);
+wire[32-1:0]  branch_addr = {{14{immi[EX][15]}}, immi[EX], 2'b0} + pc4[EX];
+wire[32-1:0]  jump_addr   = {pc[EX][31:28],      immj[EX], 2'b0};
+//assign      jal =   //jump and link
+//  opcode[ID] == `INST_J_JAL ||
+// (opcode[ID] == `INST_R && funct[ID] == `FUNCT_JALR);
+//assign      jr  =   //jump register
+//  opcode[ID] == `INST_R && (funct[ID] == `FUNCT_JR || funct[ID] == `FUNCT_JALR);
+reg   opj=0, opbeq=0, opbne=0;
 always @(posedge clk) begin
-  if(rst) begin
-    bmiss_mm  <= 0;
-  end else if(bpred[EX][32]) begin
-    // pred was taken
-    bmiss_mm  <= valid[EX] && (!btaken || btpc[EX]!=bpred[EX][0+:32]);
-  end else begin
-    // pred was untaken
-    bmiss_mm  <= valid[EX] && (btaken);
-  end
-  bact_mm <= rst ? 0 : {btaken, btaken ? btpc[EX] : pc4[EX]};
+  btpc[MM] <=  // branch target
+    //opcode[ID]==`INST_J_JAL ||
+    opcode[EX]==`INST_J_J   ? jump_addr   :
+    //jr                      ? rrs_fwd_ex  :
+                              branch_addr;
+  opj   <= opcode[EX]==`INST_J_J;
+  opbeq <= opcode[EX]==`INST_I_BEQ;
+  opbne <= opcode[EX]==`INST_I_BNE;
 end
 
 always @(posedge clk) begin
@@ -223,10 +206,29 @@ MEM #(
 always @(posedge clk) ldd[WB]   <= rst ? 0 : w_ldd;
 always @(posedge clk) rslt[WB]  <= rst ? 0 : rslt_mm;
 
+// Check branch prediction
+wire  btaken = // Is actual condition taken?
+  //jal || jr ||
+  opj                         ||
+  (opbeq && rrs[MM]==rrt[MM]) ||
+  (opbne && rrs[MM]!=rrt[MM]);
+reg   btaken_wb=0;
+always @(posedge clk) begin
+  if(rst) begin
+    bmiss_wb  <= 0;
+  end else if(bpred[MM][32]) begin
+    // pred was taken
+    bmiss_wb  <= valid[MM] && (!btaken || btpc[MM]!=bpred[MM][0+:32]);
+  end else begin
+    // pred was untaken
+    bmiss_wb  <= valid[MM] && (btaken);
+  end
+  btaken_wb <= rst ? 0 : btaken;
+end
 
 // WB ------------------------------------------------------------
-assign  w_rrd  = mld[WB] ? ldd[WB] : rslt[WB];
-
+assign  w_rrd   = mld[WB] ? ldd[WB] : rslt[WB];
+assign  bact_wb = {btaken_wb, btaken_wb ? btpc[WB] : pc4[WB]};
 
 // misc ----------------------------------------------------------
 always @(posedge clk) led <= rslt[WB];
