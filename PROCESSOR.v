@@ -141,19 +141,20 @@ always @(posedge clk) begin
 
 end
 
-// comparing r[st]==rd for 2nd forwarding
+// Forward rd in MM in 2nd forwarding?
 reg rsrd=0, rtrd=0;
-always @(posedge clk) rsrd <= rs[ID]==rd[EX];
-always @(posedge clk) rtrd <= rt[ID]==rd[EX];
+always @(posedge clk) rsrd <= rs[ID]==rd[EX] && rwe[EX] && valid[EX];
+always @(posedge clk) rtrd <= rt[ID]==rd[EX] && rwe[EX] && valid[EX];
+
+
 // EX ------------------------------------------------------------
 // 2nd forwarding
-
 wire[32-1:0]  rrs_fwd =
-    rsrd && rwe[MM] && valid[MM]/*&&~mld[MM]*/? rslt_mm   : // alu result in MM
-                                                rrs[EX];
+    rsrd /*&&~mld[MM]*/ ?   rslt_mm   : // alu result in MM
+                            rrs[EX];
 wire[32-1:0]  rrt_fwd =
-    rtrd && rwe[MM] && valid[MM]/*&&~mld[MM]*/? rslt_mm   : // alu result
-                                                rrt[EX];
+    rtrd /*&&~mld[MM]*/ ?   rslt_mm   : // alu result
+                            rrt[EX];
 ALU alu (
   .clk(clk),  .rst(rst),
   .opcode(opcode[EX]),
