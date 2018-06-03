@@ -168,14 +168,14 @@ always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
 wire[32-1:0]  branch_addr = {{14{immi[EX][15]}}, immi[EX], 2'b0} + pc4[EX];
 wire[32-1:0]  jump_addr   = {pc[EX][31:28],      immj[EX], 2'b0};
 //assign      jal =   //jump and link
-//  opcode[ID] == `INST_J_JAL ||
-// (opcode[ID] == `INST_R && funct[ID] == `FUNCT_JALR);
+//  opcode[EX] == `INST_J_JAL ||
+// (opcode[EX] == `INST_R && funct[EX] == `FUNCT_JALR);
 //assign      jr  =   //jump register
-//  opcode[ID] == `INST_R && (funct[ID] == `FUNCT_JR || funct[ID] == `FUNCT_JALR);
+//  opcode[EX] == `INST_R && (funct[EX] == `FUNCT_JR || funct[EX] == `FUNCT_JALR);
 reg   opj=0, opbeq=0, opbne=0;
 always @(posedge clk) begin
   btpc[MM] <=  // branch target
-    //opcode[ID]==`INST_J_JAL ||
+    //opcode[EX]==`INST_J_JAL ||
     opcode[EX]==`INST_J_J   ? jump_addr   :
     //jr                      ? rrs_fwd_ex  :
                               branch_addr;
