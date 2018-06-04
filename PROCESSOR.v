@@ -19,7 +19,7 @@ reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[ID:WB];
-reg [33-1:0]  bpred[EX:WB]; // {pred_taken (1bit), target_pc (32bit)}
+reg [33-1:0]  bpred[EX:WB]; // {valid (1bit), target_pc (32bit)}
 wire[33-1:0]  bact_wb;      // actual branch condition
 reg           bmiss_wb;
 
@@ -211,23 +211,27 @@ wire  btaken = // Is actual condition taken?
   opj                         ||
   (opbeq && rrs[MM]==rrt[MM]) ||
   (opbne && rrs[MM]!=rrt[MM]);
-reg   btaken_wb=0;
+reg   branch_wb=0, btaken_wb=0;
 always @(posedge clk) begin
   if(rst) begin
     bmiss_wb  <= 0;
   end else if(bpred[MM][32]) begin
-    // pred was taken
-    bmiss_wb  <= valid[MM] && (!btaken || btpc[MM]!=bpred[MM][0+:32]);
+    // pred was valid
+    // miss if (actual target) != (predicted target)
+    bmiss_wb  <= valid[MM] && (
+      btaken ? btpc[MM]!=bpred[MM][0+:32] : pc4[MM]!=bpred[MM][0+:32]);
   end else begin
-    // pred was untaken
+    // pred was not valid: always untaken && (predicted target) == pc4
+    // miss if taken
     bmiss_wb  <= valid[MM] && (btaken);
   end
   btaken_wb <= rst ? 0 : btaken;
+  branch_wb <= rst ? 0 : opj || opbeq || opbne;
 end
 
 // WB ------------------------------------------------------------
 assign  w_rrd   = mld[WB] ? ldd_wb : rslt[WB];
-assign  bact_wb = {btaken_wb, btaken_wb ? btpc[WB] : pc4[WB]};
+assign  bact_wb = {branch_wb, btaken_wb ? btpc[WB] : pc4[WB]};
 
 // misc ----------------------------------------------------------
 always @(posedge clk) led <= rslt[WB];
