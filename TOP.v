@@ -39,7 +39,7 @@ always @(posedge clk) begin
     if((i+1)%8==0) $write("\n");
   end
 
-  if(!rst && p.ir_ig==32'h0)  nopcnt = nopcnt + 1;
+  if(!p.rst && p.ir_ig==32'h0)nopcnt = nopcnt + 1;
   else                        nopcnt = 0;
 
   if(nopcnt >= 6 || p.pc[0][1:0]!=2'b00) begin
@@ -55,8 +55,8 @@ always @(posedge clk) begin
   end
 end
 
-wire[32-1:0] dummy;
+wire[16-1:0] dummy;
 PROCESSOR p(
-  .clk(clk), .rst(rst), .led(dummy));
+  .w_clk(clk), .w_rst(rst), .w_led(dummy));
 endmodule
 

@@ -3,10 +3,21 @@
 `include "INST.v"
 
 module PROCESSOR (
-  input   wire          clk,
-  input   wire          rst,
-  output  reg [32-1:0]  led
+  input   wire          w_clk,
+  input   wire          w_rst,
+  output  reg [16-1:0]  w_led
 );
+
+wire  clk, locked;
+clk_wiz_0 clk_wiz (clk, w_rst, locked, w_clk);
+
+wire        rst_async = ~locked | w_rst;
+reg [8-1:0] rst_sync;
+reg         rst=0;
+always @(posedge clk or posedge rst_async) begin
+  rst_sync  <= rst_async ? ~0 : {rst_sync[0+:7], 1'b0};
+  rst       <= rst_sync[7];
+end
 
 localparam IF = 0, IG = 1, ID = 2, EX = 3, MM = 4, WB = 5;
 
@@ -241,7 +252,7 @@ assign  w_rrd   = mld[WB] ? ldd_wb : rslt[WB];
 assign  bact_wb = {branch_wb, btaken_wb ? btpc[WB] : pc4[WB]};
 
 // misc ----------------------------------------------------------
-always @(posedge clk) led <= rslt[WB];
+always @(posedge clk) w_led <= rslt[WB][0+:16];
 
 endmodule
 
