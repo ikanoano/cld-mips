@@ -31,7 +31,7 @@ end
 
 integer i;
 initial for (i = 0; i < 32; i = i + 1) r[i] = 0;
-always @(posedge clk) if(r[0]!=0) begin
+always @(posedge clk) if(rd==0 && we) begin
   $display("assertion failed: $0 must be 0");
   $finish();
 end
