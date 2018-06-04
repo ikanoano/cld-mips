@@ -33,9 +33,9 @@ always @(posedge clk) begin
   for (i = MM; i <= WB; i = i + 1)  immj[i]   <= rst ? 0 : immj[i-1];
   for (i = WB; i <= WB; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
   for (i = WB; i <= WB; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
-  for (i = MM; i <= WB; i = i + 1)  rwe[i]    <= rst ? 0 : valid[i-1]&rwe[i-1];
-  for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : valid[i-1]&mld[i-1];
-  for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : valid[i-1]&mwe[i-1];
+  for (i = MM; i <= WB; i = i + 1)  rwe[i]    <= rst ? 0 : rwe[i-1];
+  for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : mld[i-1];
+  for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : mwe[i-1];
   for (i = WB; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
   for (i = MM; i <= WB; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
 end
