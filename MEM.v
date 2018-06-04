@@ -11,7 +11,7 @@ module MEM #(
   input   wire[   32-1:0]   addr,
   input   wire[WIDTH-1:0]   in,
   input   wire              we,
-  output  wire[WIDTH-1:0]   out
+  output  reg [WIDTH-1:0]   out
 );
 
 localparam  ADDR_WIDTH = `LOG2(WORD);
@@ -20,14 +20,15 @@ reg [WIDTH-1:0]   mem[0:WORD-1];
 
 always @(posedge clk) begin
   if(we)  mem[addr[0+:ADDR_WIDTH]] <= in;
+  out <= mem[addr[0+:ADDR_WIDTH]];
 end
-assign  out = mem[addr[0+:ADDR_WIDTH]];
 
 integer i;
 initial begin
   // Initialize with dummy value or mem will be eliminated by optimization.
-  for (i = 0; i < WORD; i = i + 1) mem[i] = i | i<<16;
+  for (i = 0; i < WORD; i = i + 1) mem[i] = WORD-i;
   $readmemh("main.mem", mem, 0, WORD-1);
 end
+initial out=0;
 
 endmodule

@@ -33,14 +33,14 @@ integer i;
 always @(posedge clk) begin
   //r[8] == $t0
   #10
-  $write("pc=%x ir=%x :\n", p.pc[0], p.ir);
+  $write("pc=%x ir=%x :\n", p.pc[1], p.ir_id);
   for(i=0; i<32; i=i+1) begin
     $write("%x,", p.regfile.r[i]);
     if((i+1)%8==0) $write("\n");
   end
 
-  if(!rst && p.ir==32'h0) nopcnt = nopcnt + 1;
-  else                    nopcnt = 0;
+  if(!rst && p.ir_id==32'h0)  nopcnt = nopcnt + 1;
+  else                        nopcnt = 0;
 
   if(nopcnt >= 6 || p.pc[0][1:0]!=2'b00) begin
     $display("");
