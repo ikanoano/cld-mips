@@ -118,8 +118,8 @@ always @(posedge clk) begin
     rst                                     ? 0         : // $0
     rt[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
                                               w_rrt;
-  immi[EX] = ir_id[0+:16];
-  immj[EX] = ir_id[0+:26];
+  immi[EX] <= ir_id[0+:16];
+  immj[EX] <= ir_id[0+:26];
   // Fix register dstination if opcode was not R format.
   ir[EX] <= {
     ir_id[31:16],
