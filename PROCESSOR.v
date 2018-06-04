@@ -19,35 +19,36 @@ always @(posedge clk or posedge rst_async) begin
   rst       <= rst_sync[7];
 end
 
-localparam IF = 0, IG = 1, ID = 2, EX = 3, MM = 4, WB = 5;
+localparam IF = 0, IG = 1, ID = 2, EX = 3, MM = 4, WA = 5, WB = 6;
 
 reg [32-1:0]  pc[IF:WB],  pc4[IG:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
 reg [32-1:0]  ir[ID:WB];
 wire[32-1:0]  ir_ig;
 reg [16-1:0]  immi[EX:WB];  // immediate for I format
 reg [26-1:0]  immj[EX:WB];  // immediate for J format
-reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB];
+reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WA:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[IG:WB];
 reg [33-1:0]  bpred[ID:WB]; // {valid (1bit), target_pc (32bit)}
-wire[33-1:0]  bact_wb;      // actual branch condition
-reg           bmiss_wb;
+wire[33-1:0]  bact_wa;      // actual branch condition
+reg           bmiss_wa;
 
 integer i;
 always @(posedge clk) begin
   for (i = ID; i <= WB; i = i + 1)  pc[i]     <= rst ? 0 : pc[i-1];
   for (i = ID; i <= WB; i = i + 1)  pc4[i]    <= rst ? 0 : pc4[i-1];
-  for (i = WB; i <= WB; i = i + 1)  btpc[i]   <= rst ? 0 : btpc[i-1];
+  for (i = WA; i <= WB; i = i + 1)  btpc[i]   <= rst ? 0 : btpc[i-1];
   for (i = MM; i <= WB; i = i + 1)  ir[i]     <= rst ? 0 : ir[i-1];
   for (i = MM; i <= WB; i = i + 1)  immi[i]   <= rst ? 0 : immi[i-1];
   for (i = MM; i <= WB; i = i + 1)  immj[i]   <= rst ? 0 : immj[i-1];
-  for (i = WB; i <= WB; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
-  for (i = WB; i <= WB; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
+  for (i = WA; i <= WB; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
+  for (i = WA; i <= WB; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
+  for (i = WB; i <= WB; i = i + 1)  rslt[i]   <= rst ? 0 : rslt[i-1];
   for (i = MM; i <= WB; i = i + 1)  rwe[i]    <= rst ? 0 : rwe[i-1];
   for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : mld[i-1];
   for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : mwe[i-1];
-  for (i = WB; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
+  for (i = WA; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
   for (i = EX; i <= WB; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
 end
 
@@ -67,7 +68,7 @@ wire[33-1:0]  bpred_ig;
 always @(posedge clk) begin
   pc[IF] <=
     rst           ? 0                 :
-    bmiss_wb      ? bact_wb[0+:32]    :
+    bmiss_wa      ? bact_wa[0+:32]    :
     bpred_ig[32]  ? bpred_ig[0+:32]   :
                     pc4_if;
 end
@@ -86,10 +87,10 @@ always @(posedge clk) begin
   pc4[IG]   <= rst ? 0 : pc[IF]+4;
 
   // Invalidate instruction on failing branch prediction.
-  valid[IG] <= !bmiss_wb;
-  valid[ID] <= !bmiss_wb & valid[IG];
-  valid[EX] <= !bmiss_wb & valid[ID];
-  valid[MM] <= !bmiss_wb & valid[EX];
+  valid[IG] <= !bmiss_wa;
+  valid[ID] <= !bmiss_wa & valid[IG];
+  valid[EX] <= !bmiss_wa & valid[ID];
+  valid[MM] <= !bmiss_wa & valid[EX];
 end
 
 // TODO: add tag to use pc[3+:] , pc[4+:] instead of pc[2+:]
@@ -100,9 +101,9 @@ MEM_2R1W #(
   .WORD(2**BTB_PC_WIDTH)
 ) btb (
   .clk(clk),  .rst(rst),
-  .addr0({BTB_DUMMYZERO, pc[WB][2+:BTB_PC_WIDTH]}),
-  .in0(bact_wb),
-  .we0(bmiss_wb),
+  .addr0({BTB_DUMMYZERO, pc[WA][2+:BTB_PC_WIDTH]}),
+  .in0(bact_wa),
+  .we0(bmiss_wa),
   .out0(),
 // HACK: 2+:BTB_PC_WIDTH assumes consecutive branch instruction. 4 is also OK.
   .addr1({BTB_DUMMYZERO, pc[IF][2+:BTB_PC_WIDTH]}),
@@ -126,16 +127,18 @@ GPR regfile (
   .rd(rd[WB]),  .rrd(w_rrd),  .we(rwe[WB]&&valid[WB])
 );
 
-wire[32-1:0]  rslt_mm;
+wire[32-1:0]  rslt_mm, w_rrd_wa;
 always @(posedge clk) begin
   // 1st forwarding
   // rwe includes rd!=0
   rrs[EX] <=
     rst                                     ? 0         : // $0
+    rs[ID]==rd[WA] && rwe[WA] && valid[WA]  ? w_rrd_wa  : // result in WA
     rs[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
                                               w_rrs;
   rrt[EX] <=
     rst                                     ? 0         : // $0
+    rt[ID]==rd[WA] && rwe[WA] && valid[WA]  ? w_rrd_wa  : //
     rt[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
                                               w_rrt;
   immi[EX] <= ir[ID][0+:16];
@@ -159,18 +162,18 @@ end
 
 // Forward rd in MM in 2nd forwarding?
 reg rsrd=0, rtrd=0;
-always @(posedge clk) rsrd <= rs[ID]==rd[EX] && rwe[EX] && valid[EX];
-always @(posedge clk) rtrd <= rt[ID]==rd[EX] && rwe[EX] && valid[EX];
+always @(posedge clk) rsrd <= rs[ID]==rd[EX] && rwe[EX];
+always @(posedge clk) rtrd <= rt[ID]==rd[EX] && rwe[EX];
 
 
 // EX ------------------------------------------------------------
 // 2nd forwarding
 wire[32-1:0]  rrs_fwd =
-    rsrd /*&&~mld[MM]*/ ?   rslt_mm   : // alu result in MM
-                            rrs[EX];
+    rsrd /*&&~mld[MM]*/ && valid[MM]  ?   rslt_mm   : // alu result in MM
+                                          rrs[EX];
 wire[32-1:0]  rrt_fwd =
-    rtrd /*&&~mld[MM]*/ ?   rslt_mm   : // alu result
-                            rrt[EX];
+    rtrd /*&&~mld[MM]*/ && valid[MM]  ?   rslt_mm   : // alu result
+                                          rrt[EX];
 ALU alu (
   .clk(clk),  .rst(rst),
   .opcode_fwd(opcode[ID]),  .opcode(opcode[EX]),
@@ -204,7 +207,7 @@ end
 
 always @(posedge clk) begin
   if(((rs[EX]==rd[MM] || rt[EX]==rd[MM]) && mld[MM] && valid[MM]) ||
-     ((rs[EX]==rd[WB] || rt[EX]==rd[WB]) && mld[WB] && valid[WB])) begin
+     ((rs[EX]==rd[WA] || rt[EX]==rd[WA]) && mld[WA] && valid[WA])) begin
     // needs data forwarding from memory && not ready
     $display("Not supported: kuso zako compiler");
     $finish();
@@ -212,16 +215,16 @@ always @(posedge clk) begin
 end
 
 // MM ------------------------------------------------------------
-wire[32-1:0]  ldd_wb;
+wire[32-1:0]  ldd_wa;
 MEM #(
   .WIDTH(32),
   .WORD(4096)
 ) dmem (
   .clk(clk),    .rst(rst),
   .addr({2'b0, rslt_mm[2+:30]}),
-  .out(ldd_wb),  .in(rrt[MM]), .we(mwe[MM]&&valid[MM])
+  .out(ldd_wa),  .in(rrt[MM]), .we(mwe[MM]&&valid[MM])
 );
-always @(posedge clk) rslt[WB]  <= rst ? 0 : rslt_mm;
+always @(posedge clk) rslt[WA]  <= rst ? 0 : rslt_mm;
 
 // Check branch prediction
 wire  btaken = // Is actual condition taken?
@@ -229,30 +232,36 @@ wire  btaken = // Is actual condition taken?
   opj                         ||
   (opbeq && rrs[MM]==rrt[MM]) ||
   (opbne && rrs[MM]!=rrt[MM]);
-reg   branch_wb=0, btaken_wb=0;
+reg   branch_wa=0, btaken_wa=0;
 always @(posedge clk) begin
   if(rst) begin
-    bmiss_wb  <= 0;
+    bmiss_wa  <= 0;
   end else if(bpred[MM][32]) begin
     // pred was valid
     // miss if (actual target) != (predicted target)
-    bmiss_wb  <= valid[MM] && (
+    bmiss_wa  <= valid[MM] && (
       btaken ? btpc[MM]!=bpred[MM][0+:32] : pc4[MM]!=bpred[MM][0+:32]);
   end else begin
     // pred was not valid: always untaken && (predicted target) == pc4
     // miss if taken
-    bmiss_wb  <= valid[MM] && (btaken);
+    bmiss_wa  <= valid[MM] && (btaken);
   end
-  btaken_wb <= rst ? 0 : btaken;
-  branch_wb <= rst ? 0 : opj || opbeq || opbne;
+  btaken_wa <= rst ? 0 : btaken;
+  branch_wa <= rst ? 0 : opj || opbeq || opbne;
 end
 
+// WA ------------------------------------------------------------
+reg [32-1:0]  rrd_wa = 0;
+assign  w_rrd_wa= mld[WA] ? ldd_wa : rslt[WA];
+always @(posedge clk) rrd_wa <= rst ? 0 : w_rrd_wa;
+
+assign  bact_wa = {branch_wa, btaken_wa ? btpc[WA] : pc4[WA]};
+
 // WB ------------------------------------------------------------
-assign  w_rrd   = mld[WB] ? ldd_wb : rslt[WB];
-assign  bact_wb = {branch_wb, btaken_wb ? btpc[WB] : pc4[WB]};
+assign  w_rrd   = rrd_wa;
 
 // misc ----------------------------------------------------------
-always @(posedge clk) w_led <= rslt[WB][0+:16];
+always @(posedge clk) w_led <= rslt[WA][0+:16];
 
 endmodule
 
