@@ -8,43 +8,44 @@ module PROCESSOR (
   output  reg [32-1:0]  led
 );
 
-localparam IF = 0, IG = 1, ID = 2, EX = 3, MM = 4, WB = 5;
+localparam IF = 0, IG = 1, ID = 2, EX = 3, MM = 4, WB = 5, WC = 6;
 
-reg [32-1:0]  pc[IF:WB],  pc4[IG:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
-reg [32-1:0]  ir[ID:WB];
+reg [32-1:0]  pc[IF:WC],  pc4[IG:WC], btpc[MM:WC]; // pc, pc+4, branch target pc
+reg [32-1:0]  ir[ID:WC];
 wire[32-1:0]  ir_ig;
-reg [16-1:0]  immi[EX:WB];  // immediate for I format
-reg [26-1:0]  immj[EX:WB];  // immediate for J format
-reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB];
-reg           rwe[EX:WB];   // register write enable
-reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
-reg           valid[IG:WB];
-reg [33-1:0]  bpred[ID:WB]; // {valid (1bit), target_pc (32bit)}
+reg [16-1:0]  immi[EX:WC];  // immediate for I format
+reg [26-1:0]  immj[EX:WC];  // immediate for J format
+reg [32-1:0]  rrs[EX:WC], rrt[EX:WC], rslt[WB:WC];
+reg           rwe[EX:WC];   // register write enable
+reg           mld[EX:WC], mwe[EX:WC];   // dmem load / dmem write enable
+reg           valid[IG:WC];
+reg [33-1:0]  bpred[ID:WC]; // {valid (1bit), target_pc (32bit)}
 wire[33-1:0]  bact_wb;      // actual branch condition
 reg           bmiss_wb;
 
 integer i;
 always @(posedge clk) begin
-  for (i = ID; i <= WB; i = i + 1)  pc[i]     <= rst ? 0 : pc[i-1];
-  for (i = ID; i <= WB; i = i + 1)  pc4[i]    <= rst ? 0 : pc4[i-1];
-  for (i = WB; i <= WB; i = i + 1)  btpc[i]   <= rst ? 0 : btpc[i-1];
-  for (i = MM; i <= WB; i = i + 1)  ir[i]     <= rst ? 0 : ir[i-1];
-  for (i = MM; i <= WB; i = i + 1)  immi[i]   <= rst ? 0 : immi[i-1];
-  for (i = MM; i <= WB; i = i + 1)  immj[i]   <= rst ? 0 : immj[i-1];
-  for (i = WB; i <= WB; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
-  for (i = WB; i <= WB; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
-  for (i = MM; i <= WB; i = i + 1)  rwe[i]    <= rst ? 0 : rwe[i-1];
-  for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : mld[i-1];
-  for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : mwe[i-1];
-  for (i = WB; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
-  for (i = EX; i <= WB; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
+  for (i = ID; i <= WC; i = i + 1)  pc[i]     <= rst ? 0 : pc[i-1];
+  for (i = ID; i <= WC; i = i + 1)  pc4[i]    <= rst ? 0 : pc4[i-1];
+  for (i = WB; i <= WC; i = i + 1)  btpc[i]   <= rst ? 0 : btpc[i-1];
+  for (i = MM; i <= WC; i = i + 1)  ir[i]     <= rst ? 0 : ir[i-1];
+  for (i = MM; i <= WC; i = i + 1)  immi[i]   <= rst ? 0 : immi[i-1];
+  for (i = MM; i <= WC; i = i + 1)  immj[i]   <= rst ? 0 : immj[i-1];
+  for (i = WB; i <= WC; i = i + 1)  rrs[i]    <= rst ? 0 : rrs[i-1];
+  for (i = WB; i <= WC; i = i + 1)  rrt[i]    <= rst ? 0 : rrt[i-1];
+  for (i = WC; i <= WC; i = i + 1)  rslt[i]   <= rst ? 0 : rslt[i-1];
+  for (i = MM; i <= WC; i = i + 1)  rwe[i]    <= rst ? 0 : rwe[i-1];
+  for (i = MM; i <= WC; i = i + 1)  mld[i]    <= rst ? 0 : mld[i-1];
+  for (i = MM; i <= WC; i = i + 1)  mwe[i]    <= rst ? 0 : mwe[i-1];
+  for (i = WB; i <= WC; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
+  for (i = EX; i <= WC; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
 end
 
-wire[ 6-1:0]  opcode[IG:WB], funct[IG:WB];
-wire[ 5-1:0]  rs[IG:WB],  rt[IG:WB],  rd[IG:WB];
-wire[ 5-1:0]  shamt[IG:WB];
+wire[ 6-1:0]  opcode[IG:WC], funct[IG:WC];
+wire[ 5-1:0]  rs[IG:WC],  rt[IG:WC],  rd[IG:WC];
+wire[ 5-1:0]  shamt[IG:WC];
 generate genvar gi;
-  for (gi = IG; gi <= WB; gi = gi + 1)
+  for (gi = IG; gi <= WC; gi = gi + 1)
     assign {opcode[gi], rs[gi], rt[gi], rd[gi], shamt[gi], funct[gi]} =
       gi==IG ? ir_ig : ir[gi];
 endgenerate
@@ -112,19 +113,21 @@ wire[32-1:0]  w_rrs, w_rrt, w_rrd;
 GPR regfile (
   .clk(clk),    .rst(rst),
   .rs(rs[ID]),  .rt(rt[ID]),  .rrs(w_rrs),  .rrt(w_rrt),
-  .rd(rd[WB]),  .rrd(w_rrd),  .we(rwe[WB]&&valid[WB])
+  .rd(rd[WC]),  .rrd(w_rrd),  .we(rwe[WC]&&valid[WC])
 );
 
-wire[32-1:0]  rslt_mm;
+wire[32-1:0]  rslt_mm, w_rrd_wb;
 always @(posedge clk) begin
   // 1st forwarding
   // rwe includes rd!=0
   rrs[EX] <=
     rst                                     ? 0         : // $0
+    rs[ID]==rd[WB] && rwe[WB] && valid[WB]  ? w_rrd_wb  : // result in WB
     rs[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
                                               w_rrs;
   rrt[EX] <=
     rst                                     ? 0         : // $0
+    rt[ID]==rd[WB] && rwe[WB] && valid[WB]  ? w_rrd_wb  : //
     rt[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
                                               w_rrt;
   immi[EX] <= ir[ID][0+:16];
@@ -237,8 +240,14 @@ always @(posedge clk) begin
 end
 
 // WB ------------------------------------------------------------
-assign  w_rrd   = mld[WB] ? ldd_wb : rslt[WB];
+reg [32-1:0]  rrd_wb = 0;
+assign  w_rrd_wb= mld[WB] ? ldd_wb : rslt[WB];
+always @(posedge clk) rrd_wb <= rst ? 0 : w_rrd_wb;
+
 assign  bact_wb = {branch_wb, btaken_wb ? btpc[WB] : pc4[WB]};
+
+// WC ------------------------------------------------------------
+assign  w_rrd   = rrd_wb;
 
 // misc ----------------------------------------------------------
 always @(posedge clk) led <= rslt[WB];
