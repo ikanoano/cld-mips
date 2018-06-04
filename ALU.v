@@ -117,16 +117,7 @@ always @(posedge clk) begin
                                                 3'hX;
 end
 
-assign  rslt =
-  rslt_sel==SEL_LOGI  ? rslt_logi:
-  rslt_sel==SEL_ADD   ? rslt_add :
-//rslt_sel==SEL_SUB   ? rslt_sub :
-  rslt_sel==SEL_SLL   ? rslt_sll :
-  rslt_sel==SEL_SRL   ? rslt_srl :
-//rslt_sel==SEL_SRA   ? rslt_sra :
-  rslt_sel==SEL_SLT   ? rslt_slt :
-//rslt_sel==SEL_SLTU  ? rslt_sltu:
-                        32'hXXXX;
+assign  rslt = rslt_add;
 
 reg [5-1:0] last_shamt=0;
 always @(posedge clk) begin
