@@ -8,25 +8,25 @@ module PROCESSOR (
   output  reg [32-1:0]  led
 );
 
-localparam IF = 0, ID = 1, EX = 2, MM = 3, WB = 4;
+localparam IF = 0, IG = 1, ID = 2, EX = 3, MM = 4, WB = 5;
 
-reg [32-1:0]  pc[IF:WB],  pc4[ID:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
-reg [32-1:0]  ir[EX:WB];
-wire[32-1:0]  ir_id;
+reg [32-1:0]  pc[IF:WB],  pc4[IG:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
+reg [32-1:0]  ir[ID:WB];
+wire[32-1:0]  ir_ig;
 reg [16-1:0]  immi[EX:WB];  // immediate for I format
 reg [26-1:0]  immj[EX:WB];  // immediate for J format
 reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WB:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
-reg           valid[ID:WB];
-reg [33-1:0]  bpred[EX:WB]; // {valid (1bit), target_pc (32bit)}
+reg           valid[IG:WB];
+reg [33-1:0]  bpred[ID:WB]; // {valid (1bit), target_pc (32bit)}
 wire[33-1:0]  bact_wb;      // actual branch condition
 reg           bmiss_wb;
 
 integer i;
 always @(posedge clk) begin
-  for (i = EX; i <= WB; i = i + 1)  pc[i]     <= rst ? 0 : pc[i-1];
-  for (i = EX; i <= WB; i = i + 1)  pc4[i]    <= rst ? 0 : pc4[i-1];
+  for (i = ID; i <= WB; i = i + 1)  pc[i]     <= rst ? 0 : pc[i-1];
+  for (i = ID; i <= WB; i = i + 1)  pc4[i]    <= rst ? 0 : pc4[i-1];
   for (i = WB; i <= WB; i = i + 1)  btpc[i]   <= rst ? 0 : btpc[i-1];
   for (i = MM; i <= WB; i = i + 1)  ir[i]     <= rst ? 0 : ir[i-1];
   for (i = MM; i <= WB; i = i + 1)  immi[i]   <= rst ? 0 : immi[i-1];
@@ -37,26 +37,27 @@ always @(posedge clk) begin
   for (i = MM; i <= WB; i = i + 1)  mld[i]    <= rst ? 0 : mld[i-1];
   for (i = MM; i <= WB; i = i + 1)  mwe[i]    <= rst ? 0 : mwe[i-1];
   for (i = WB; i <= WB; i = i + 1)  valid[i]  <= rst ? 0 : valid[i-1];
-  for (i = MM; i <= WB; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
+  for (i = EX; i <= WB; i = i + 1)  bpred[i]  <= rst ? 0 : bpred[i-1];
 end
 
-wire[ 6-1:0]  opcode[ID:WB], funct[ID:WB];
-wire[ 5-1:0]  rs[ID:WB],  rt[ID:WB],  rd[ID:WB];
-wire[ 5-1:0]  shamt[ID:WB];
+wire[ 6-1:0]  opcode[IG:WB], funct[IG:WB];
+wire[ 5-1:0]  rs[IG:WB],  rt[IG:WB],  rd[IG:WB];
+wire[ 5-1:0]  shamt[IG:WB];
 generate genvar gi;
-  assign {opcode[ID], rs[ID], rt[ID], rd[ID], shamt[ID], funct[ID]} = ir_id;
-  for (gi = EX; gi <= WB; gi = gi + 1) begin
-    assign {opcode[gi], rs[gi], rt[gi], rd[gi], shamt[gi], funct[gi]} = ir[gi];
-  end
+  for (gi = IG; gi <= WB; gi = gi + 1)
+    assign {opcode[gi], rs[gi], rt[gi], rd[gi], shamt[gi], funct[gi]} =
+      gi==IG ? ir_ig : ir[gi];
 endgenerate
+
+
 // IF ------------------------------------------------------------
 wire[32-1:0]  pc4_if = pc[IF]+4;
-wire[33-1:0]  bpred_id;
+wire[33-1:0]  bpred_ig;
 always @(posedge clk) begin
   pc[IF] <=
     rst           ? 0                 :
     bmiss_wb      ? bact_wb[0+:32]    :
-    bpred_id[32]  ? bpred_id[0+:32]  :
+    bpred_ig[32]  ? bpred_ig[0+:32]   :
                     pc4_if;
 end
 
@@ -66,15 +67,16 @@ MEM #(
 ) imem (
   .clk(clk),            .rst(rst),
   .addr({2'b0, pc[IF][2+:30]}),
-  .out(ir_id),  .in(0),   .we(1'b0)
+  .out(ir_ig),  .in(0),   .we(1'b0)
 );
 
 always @(posedge clk) begin
-  pc[ID]    <= pc[IF];
-  pc4[ID]   <= pc[IF]+4;
+  pc[IG]    <= rst ? 0 : pc[IF];
+  pc4[IG]   <= rst ? 0 : pc[IF]+4;
 
   // Invalidate instruction on failing branch prediction.
-  valid[ID] <= !bmiss_wb;
+  valid[IG] <= !bmiss_wb;
+  valid[ID] <= !bmiss_wb & valid[IG];
   valid[EX] <= !bmiss_wb & valid[ID];
   valid[MM] <= !bmiss_wb & valid[EX];
 end
@@ -93,8 +95,15 @@ MEM_2R1W #(
   .out0(),
 // HACK: 2+:BTB_PC_WIDTH assumes consecutive branch instruction. 4 is also OK.
   .addr1({BTB_DUMMYZERO, pc[IF][2+:BTB_PC_WIDTH]}),
-  .out1(bpred_id)
+  .out1(bpred_ig)
 );
+
+
+// IG ------------------------------------------------------------
+always @(posedge clk) begin
+  bpred[ID] <= rst ? 0 : bpred_ig;
+  ir[ID]    <= rst ? 0 : ir_ig;
+end
 
 
 // ID ------------------------------------------------------------
@@ -118,13 +127,13 @@ always @(posedge clk) begin
     rst                                     ? 0         : // $0
     rt[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
                                               w_rrt;
-  immi[EX] <= ir_id[0+:16];
-  immj[EX] <= ir_id[0+:26];
+  immi[EX] <= ir[ID][0+:16];
+  immj[EX] <= ir[ID][0+:26];
   // Fix register dstination if opcode was not R format.
   ir[EX] <= {
-    ir_id[31:16],
+    ir[ID][31:16],
     opcode[ID]==`INST_R ? rd[ID] : rt[ID],
-    ir_id[10:0]
+    ir[ID][10:0]
   };
   // reg/mem read/write flag.
   mld[EX]<= opcode[ID]==`INST_I_LW;
@@ -135,8 +144,6 @@ always @(posedge clk) begin
     opcode[ID]!=`INST_I_SW   &&
     opcode[ID]!=`INST_J_J;
     //&& !(opcode_ex==`INST_R && funct_ex==`FUNCT_JR);
-
-  bpred[EX] <= rst ? 0 : bpred_id;
 end
 
 // Forward rd in MM in 2nd forwarding?
