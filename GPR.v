@@ -16,14 +16,12 @@ module GPR(
 );
 
 
-reg [31:0]  r[1:31];
+reg [31:0]  r[0:31];
 
 assign rrs =
-  rs==0         ? 0   :  //$0
   rs==rd && we  ? rrd :  //forwarding
                   r[rs];
 assign rrt =
-  rt==0         ? 0   :  //$0
   rt==rd && we  ? rrd :  //forwarding
                   r[rt];
 
@@ -33,5 +31,9 @@ end
 
 integer i;
 initial for (i = 0; i < 32; i = i + 1) r[i] = 0;
+always @(posedge clk) if(r[0]!=0) begin
+  $display("assertion failed: $0 must be 0");
+  $finish();
+end
 
 endmodule
