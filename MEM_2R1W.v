@@ -31,6 +31,5 @@ initial begin
   // Initialize with dummy value or mem will be eliminated by optimization.
   for (i = 0; i < WORD; i = i + 1) mem[i] = WORD-i;
 end
-initial {out0, out1}=0;
 
 endmodule

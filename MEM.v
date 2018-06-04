@@ -29,6 +29,5 @@ initial begin
   for (i = 0; i < WORD; i = i + 1) mem[i] = WORD-i;
   $readmemh("main.mem", mem, 0, WORD-1);
 end
-initial out=0;
 
 endmodule
