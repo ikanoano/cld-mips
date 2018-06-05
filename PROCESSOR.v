@@ -106,6 +106,12 @@ always @(posedge clk) begin
   ir[ID]    <= rst ? 0 : ir_ig;
 end
 
+// Forward rd in WA/MM in 1st forwarding?
+reg [1:0] rsid_rdwa=0, rtid_rdwa=0, rsid_rdmm=0, rtid_rdmm=0;
+always @(posedge clk) rsid_rdwa <= {rs[IG][2+:3]==rd[MM][2+:3], rs[IG][0+:2]==rd[MM][0+:2] && rwe[MM]};
+always @(posedge clk) rtid_rdwa <= {rt[IG][2+:3]==rd[MM][2+:3], rt[IG][0+:2]==rd[MM][0+:2] && rwe[MM]};
+always @(posedge clk) rsid_rdmm <= {rs[IG][2+:3]==rd[EX][2+:3], rs[IG][0+:2]==rd[EX][0+:2] && rwe[EX]};
+always @(posedge clk) rtid_rdmm <= {rt[IG][2+:3]==rd[EX][2+:3], rt[IG][0+:2]==rd[EX][0+:2] && rwe[EX]};
 
 // ID ------------------------------------------------------------
 wire[32-1:0]  w_rrs, w_rrt, w_rrd;
@@ -121,15 +127,15 @@ always @(posedge clk) begin
   // 1st forwarding
   // rwe includes rd!=0
   rrs[EX] <=
-    rst                                     ? 0         : // $0
-    rs[ID]==rd[WA] && rwe[WA] && valid[WA]  ? w_rrd_wa  : // result in WA
-    rs[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
-                                              w_rrs;
+    rst                     ? 0         : // $0
+    &rsid_rdwa && valid[WA] ? w_rrd_wa  : // result in WA
+    &rsid_rdmm && valid[MM] ? rslt_mm   : // alu result in MM
+                              w_rrs;
   rrt[EX] <=
-    rst                                     ? 0         : // $0
-    rt[ID]==rd[WA] && rwe[WA] && valid[WA]  ? w_rrd_wa  : //
-    rt[ID]==rd[MM] && rwe[MM] && valid[MM]  ? rslt_mm   : // alu result in MM
-                                              w_rrt;
+    rst                     ? 0         : // $0
+    &rtid_rdwa && valid[WA] ? w_rrd_wa  : //
+    &rtid_rdmm && valid[MM] ? rslt_mm   : // alu result in MM
+                              w_rrt;
   immi[EX] <= ir[ID][0+:16];
   immj[EX] <= ir[ID][0+:26];
   // Fix register dstination if opcode was not R format.
@@ -150,19 +156,19 @@ always @(posedge clk) begin
 end
 
 // Forward rd in MM in 2nd forwarding?
-reg rsrd=0, rtrd=0;
-always @(posedge clk) rsrd <= rs[ID]==rd[EX] && rwe[EX];
-always @(posedge clk) rtrd <= rt[ID]==rd[EX] && rwe[EX];
+reg rsex_rdmm=0, rtex_rdmm=0;
+always @(posedge clk) rsex_rdmm <= rs[ID]==rd[EX] && rwe[EX];
+always @(posedge clk) rtex_rdmm <= rt[ID]==rd[EX] && rwe[EX];
 
 
 // EX ------------------------------------------------------------
 // 2nd forwarding
 wire[32-1:0]  rrs_fwd =
-    rsrd /*&&~mld[MM]*/ && valid[MM]  ?   rslt_mm   : // alu result in MM
-                                          rrs[EX];
+    rsex_rdmm /*&&~mld[MM]*/ && valid[MM] ? rslt_mm   : // alu result in MM
+                                            rrs[EX];
 wire[32-1:0]  rrt_fwd =
-    rtrd /*&&~mld[MM]*/ && valid[MM]  ?   rslt_mm   : // alu result
-                                          rrt[EX];
+    rtex_rdmm /*&&~mld[MM]*/ && valid[MM] ? rslt_mm   : // alu result
+                                            rrt[EX];
 ALU alu (
   .clk(clk),  .rst(rst),
   .opcode_fwd(opcode[ID]),  .opcode(opcode[EX]),
