@@ -42,7 +42,7 @@ always @(posedge clk) begin
   if(!rst && p.ir_ig==32'h0)  nopcnt = nopcnt + 1;
   else                        nopcnt = 0;
 
-  if(nopcnt >= 6 || p.pc[0][1:0]!=2'b00) begin
+  if(nopcnt >= 6) begin
     $display("");
     $display("halt!");
     $display("cycle = %d", cycle);

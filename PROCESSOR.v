@@ -10,7 +10,7 @@ module PROCESSOR (
 
 localparam IF = 0, IG = 1, ID = 2, EX = 3, MM = 4, WA = 5, WB = 6;
 
-reg [32-1:0]  pc[IF:WB],  pc4[IG:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
+reg [30-1:0]  pc[IF:WB],  pc4[IG:WB], btpc[MM:WB]; // pc, pc+4, branch target pc
 reg [32-1:0]  ir[ID:WB];
 wire[32-1:0]  ir_ig;
 reg [16-1:0]  immi[EX:WB];  // immediate for I format
@@ -19,8 +19,8 @@ reg [32-1:0]  rrs[EX:WB], rrt[EX:WB], rslt[WA:WB];
 reg           rwe[EX:WB];   // register write enable
 reg           mld[EX:WB], mwe[EX:WB];   // dmem load / dmem write enable
 reg           valid[IG:WB];
-reg [33-1:0]  bpred[ID:WB]; // {valid (1bit), target_pc (32bit)}
-wire[33-1:0]  bact_wa;      // actual branch condition
+reg [31-1:0]  bpred[ID:WB]; // {valid (1bit), target_pc (30bit)}
+wire[31-1:0]  bact_wa;      // actual branch condition
 reg           bmiss_wa;
 
 integer i;
@@ -52,13 +52,13 @@ endgenerate
 
 
 // IF ------------------------------------------------------------
-wire[32-1:0]  pc4_if = pc[IF]+4;
-wire[33-1:0]  bpred_ig;
+wire[30-1:0]  pc4_if = pc[IF]+1;
+wire[31-1:0]  bpred_ig;
 always @(posedge clk) begin
   pc[IF] <=
     rst           ? 0                 :
-    bmiss_wa      ? bact_wa[0+:32]    :
-    bpred_ig[32]  ? bpred_ig[0+:32]   :
+    bmiss_wa      ? bact_wa[0+:30]    :
+    bpred_ig[30]  ? bpred_ig[0+:30]   :
                     pc4_if;
 end
 
@@ -67,13 +67,13 @@ MEM #(
   .WORD(4096)
 ) imem (
   .clk(clk),            .rst(rst),
-  .addr({2'b0, pc[IF][2+:30]}),
+  .addr({2'b0, pc[IF]}),
   .out(ir_ig),  .in(0),   .we(1'b0)
 );
 
 always @(posedge clk) begin
   pc[IG]    <= rst ? 0 : pc[IF];
-  pc4[IG]   <= rst ? 0 : pc[IF]+4;
+  pc4[IG]   <= rst ? 0 : pc[IF]+1;
 
   // Invalidate instruction on failing branch prediction.
   valid[IG] <= !bmiss_wa;
@@ -82,20 +82,20 @@ always @(posedge clk) begin
   valid[MM] <= !bmiss_wa & valid[EX];
 end
 
-// TODO: add tag to use pc[3+:] , pc[4+:] instead of pc[2+:]
+// TODO: add tag to use pc[1+:] , pc[2+:] instead of pc[0+:]
 localparam                      BTB_PC_WIDTH = 10;
 localparam[32-BTB_PC_WIDTH-1:0] BTB_DUMMYZERO= 0;
 MEM_2R1W #(
-  .WIDTH(1+32), // valid + PC
+  .WIDTH(1+30), // valid + PC
   .WORD(2**BTB_PC_WIDTH)
 ) btb (
   .clk(clk),  .rst(rst),
-  .addr0({BTB_DUMMYZERO, pc[WA][2+:BTB_PC_WIDTH]}),
+  .addr0({BTB_DUMMYZERO, pc[WA][0+:BTB_PC_WIDTH]}),
   .in0(bact_wa),
   .we0(bmiss_wa),
   .out0(),
 // HACK: 2+:BTB_PC_WIDTH assumes consecutive branch instruction. 4 is also OK.
-  .addr1({BTB_DUMMYZERO, pc[IF][2+:BTB_PC_WIDTH]}),
+  .addr1({BTB_DUMMYZERO, pc[IF][0+:BTB_PC_WIDTH]}),
   .out1(bpred_ig)
 );
 
@@ -186,8 +186,8 @@ ALU alu (
 always @(posedge clk) rrs[MM] <= rst ? 0 :rrs_fwd; // update
 always @(posedge clk) rrt[MM] <= rst ? 0 :rrt_fwd;
 
-wire[32-1:0]  branch_addr = {{14{immi[EX][15]}}, immi[EX], 2'b0} + pc4[EX];
-wire[32-1:0]  jump_addr   = {pc[EX][31:28],      immj[EX], 2'b0};
+wire[30-1:0]  branch_addr = {{14{immi[EX][15]}}, immi[EX]} + pc4[EX];
+wire[30-1:0]  jump_addr   = {pc[EX][29:26],      immj[EX]};
 //assign      jal =   //jump and link
 //  opcode[EX] == `INST_J_JAL ||
 // (opcode[EX] == `INST_R && funct[EX] == `FUNCT_JALR);
@@ -236,11 +236,11 @@ reg   branch_wa=0, btaken_wa=0;
 always @(posedge clk) begin
   if(rst) begin
     bmiss_wa  <= 0;
-  end else if(bpred[MM][32]) begin
+  end else if(bpred[MM][30]) begin
     // pred was valid
     // miss if (actual target) != (predicted target)
     bmiss_wa  <= valid[MM] && (
-      btaken ? btpc[MM]!=bpred[MM][0+:32] : pc4[MM]!=bpred[MM][0+:32]);
+      btaken ? btpc[MM]!=bpred[MM][0+:30] : pc4[MM]!=bpred[MM][0+:30]);
   end else begin
     // pred was not valid: always untaken && (predicted target) == pc4
     // miss if taken
