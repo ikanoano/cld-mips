@@ -250,14 +250,14 @@ always @(posedge clk) begin
 end
 
 // WA ------------------------------------------------------------
-reg [32-1:0]  rrd_wa = 0;
+reg [32-1:0]  rrd_wb = 0;
 assign  w_rrd_wa= mld[WA] ? ldd_wa : rslt[WA];
-always @(posedge clk) rrd_wa <= rst ? 0 : w_rrd_wa;
+always @(posedge clk) rrd_wb <= rst ? 0 : w_rrd_wa;
 
 assign  bact_wa = {branch_wa, btaken_wa ? btpc[WA] : pc4[WA]};
 
 // WB ------------------------------------------------------------
-assign  w_rrd   = rrd_wa;
+assign  w_rrd   = rrd_wb;
 
 // misc ----------------------------------------------------------
 always @(posedge clk) led <= rslt[WA];
