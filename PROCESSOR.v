@@ -128,13 +128,13 @@ always @(posedge clk) begin
   // rwe includes rd!=0
   rrs[EX] <=
     rst                     ? 0         : // $0
-    &rsid_rdwa && valid[WA] ? w_rrd_wa  : // result in WA
     &rsid_rdmm && valid[MM] ? rslt_mm   : // alu result in MM
+    &rsid_rdwa && valid[WA] ? w_rrd_wa  : // result in WA
                               w_rrs;
   rrt[EX] <=
     rst                     ? 0         : // $0
-    &rtid_rdwa && valid[WA] ? w_rrd_wa  : //
     &rtid_rdmm && valid[MM] ? rslt_mm   : // alu result in MM
+    &rtid_rdwa && valid[WA] ? w_rrd_wa  : //
                               w_rrt;
   immi[EX] <= ir[ID][0+:16];
   immj[EX] <= ir[ID][0+:26];
