@@ -18,12 +18,8 @@ module GPR(
 
 reg [31:0]  r[0:31];
 
-assign rrs =
-  rs==rd && we  ? rrd :  //forwarding
-                  r[rs];
-assign rrt =
-  rt==rd && we  ? rrd :  //forwarding
-                  r[rt];
+assign rrs = r[rs];
+assign rrt = r[rt];
 
 always @(posedge clk) begin
   if(we) r[rd] <= rrd;

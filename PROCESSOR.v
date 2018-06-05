@@ -107,7 +107,9 @@ always @(posedge clk) begin
 end
 
 // Forward rd in WA/MM in 1st forwarding?
-reg [1:0] rsid_rdwa=0, rtid_rdwa=0, rsid_rdmm=0, rtid_rdmm=0;
+reg [1:0] rsid_rdwb=0, rtid_rdwb=0, rsid_rdwa=0, rtid_rdwa=0, rsid_rdmm=0, rtid_rdmm=0;
+always @(posedge clk) rsid_rdwb <= {rs[IG][2+:3]==rd[WA][2+:3], rs[IG][0+:2]==rd[WA][0+:2] && rwe[WA]};
+always @(posedge clk) rtid_rdwb <= {rt[IG][2+:3]==rd[WA][2+:3], rt[IG][0+:2]==rd[WA][0+:2] && rwe[WA]};
 always @(posedge clk) rsid_rdwa <= {rs[IG][2+:3]==rd[MM][2+:3], rs[IG][0+:2]==rd[MM][0+:2] && rwe[MM]};
 always @(posedge clk) rtid_rdwa <= {rt[IG][2+:3]==rd[MM][2+:3], rt[IG][0+:2]==rd[MM][0+:2] && rwe[MM]};
 always @(posedge clk) rsid_rdmm <= {rs[IG][2+:3]==rd[EX][2+:3], rs[IG][0+:2]==rd[EX][0+:2] && rwe[EX]};
@@ -130,11 +132,13 @@ always @(posedge clk) begin
     rst                     ? 0         : // $0
     &rsid_rdmm && valid[MM] ? rslt_mm   : // alu result in MM
     &rsid_rdwa && valid[WA] ? w_rrd_wa  : // result in WA
+    &rsid_rdwb && valid[WB] ? w_rrd     : // result in WB
                               w_rrs;
   rrt[EX] <=
     rst                     ? 0         : // $0
     &rtid_rdmm && valid[MM] ? rslt_mm   : // alu result in MM
     &rtid_rdwa && valid[WA] ? w_rrd_wa  : //
+    &rtid_rdwb && valid[WB] ? w_rrd     : // result in WB
                               w_rrt;
   immi[EX] <= ir[ID][0+:16];
   immj[EX] <= ir[ID][0+:26];
