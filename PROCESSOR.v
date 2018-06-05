@@ -117,11 +117,12 @@ always @(posedge clk) rtid_rdmm <= {rt[IG][2+:3]==rd[EX][2+:3], rt[IG][0+:2]==rd
 
 // ID ------------------------------------------------------------
 wire[32-1:0]  w_rrs, w_rrt, w_rrd;
+reg           rwe_valid_wb=0;
 // w_rrd is forwarded to w_rr[st] in GPR
 GPR regfile (
   .clk(clk),    .rst(rst),
   .rs(rs[ID]),  .rt(rt[ID]),  .rrs(w_rrs),  .rrt(w_rrt),
-  .rd(rd[WB]),  .rrd(w_rrd),  .we(rwe[WB]&&valid[WB])
+  .rd(rd[WB]),  .rrd(w_rrd),  .we(rwe_valid_wb)
 );
 
 wire[32-1:0]  rslt_mm, w_rrd_wa;
@@ -252,7 +253,8 @@ end
 // WA ------------------------------------------------------------
 reg [32-1:0]  rrd_wb = 0;
 assign  w_rrd_wa= mld[WA] ? ldd_wa : rslt[WA];
-always @(posedge clk) rrd_wb <= rst ? 0 : w_rrd_wa;
+always @(posedge clk) rrd_wb        <= rst ? 0 : w_rrd_wa;
+always @(posedge clk) rwe_valid_wb  <= rst ? 0 : rwe[WA]&&valid[WA];
 
 assign  bact_wa = {branch_wa, btaken_wa ? btpc[WA] : pc4[WA]};
 
