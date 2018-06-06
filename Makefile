@@ -1,6 +1,6 @@
 TMP = tmp
-ASM = mipsel-linux-gnu-gcc -c -O0 -Wall -msoft-float -mips1
-CC  = mipsel-linux-gnu-gcc -std=c11 -c -O2 -Wall -nostdlib -mno-memcpy -static -msoft-float -mips1
+ASM = mipsel-linux-gnu-gcc -c -O0 -Wall -msoft-float -march=mips1 -mtune=r4000
+CC  = mipsel-linux-gnu-gcc -std=c11 -c -O2 -Wall -nostdlib -mno-memcpy -static -msoft-float -march=mips1 -mtune=r4000
 VCS = vcs -full64 -v2005 -Wall -LDFLAGS -no-pie
 
 LDFLAGS  = -T cld-mips.ld -nostdlib -static

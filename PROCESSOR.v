@@ -215,7 +215,7 @@ always @(posedge clk) begin
   if(((rs[EX]==rd[MM] || rt[EX]==rd[MM]) && mld[MM] && valid[MM]) ||
      ((rs[EX]==rd[WA] || rt[EX]==rd[WA]) && mld[WA] && valid[WA])) begin
     // needs data forwarding from memory && not ready
-    $display("Not supported: kuso zako compiler");
+    $display("Not supported: load delay slot < 2 cycle");
     $finish();
   end
 end
