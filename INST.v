@@ -19,7 +19,7 @@
 //`define INST_I_LH       6'h21
 //`define INST_I_LBU      6'h24
 //`define INST_I_LHU      6'h25
-//`define INST_I_LUI      6'h0f
+`define INST_I_LUI      6'h0f
 `define INST_I_LW       6'h23
 
 //`define INST_I_SB       6'h28

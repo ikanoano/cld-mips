@@ -49,9 +49,11 @@ always @(posedge clk) logi_sel <=
 localparam[3-1:0]
   SEL_LOGI=  0,
   SEL_ADD =  1,
-  SEL_SLL =  2,
-  SEL_SRL =  3,
-  SEL_SLT =  4;
+  SEL_SUB =  2,
+  SEL_SLL =  3,
+  SEL_SRL =  4,
+  SEL_SLT =  5,
+  SEL_LI  =  6;
 wire[32-1:0]  imm_s     = {{16{imm[15]}}, imm};
 wire[32-1:0]  imm_z     = {{16{   1'b0}}, imm};
 wire[32-1:0]  rrt       =
@@ -60,7 +62,7 @@ wire[32-1:0]  rrt       =
   rrt_sel==RRT_IMMS ? imm_s   :
                       32'hXXXX;
 
-reg [32-1:0]  rslt_add, rslt_sub, rslt_logi,
+reg [32-1:0]  rslt_add, rslt_sub, rslt_logi, rslt_li,
               rslt_sll, rslt_srl, rslt_sra, rslt_slt, rslt_sltu;
 
 wire[ 3-1:0]  shamt = shamt_in[0+:3];
@@ -73,6 +75,9 @@ always @(posedge clk) begin
     logi_sel==LOGI_XOR  ?   rrs ^ rrt :
     logi_sel==LOGI_NOR  ? ~(rrs | rrt):
                             32'hXXXX;
+  rslt_li   <=
+    rst                 ?   0         :
+                            {imm, 16'b0}; // load upper immediate
 
   rslt_add    <= rst ? 0 : rrs + rrt;
   rslt_sub    <= rst ? 0 : rrs - rrt_in;
@@ -90,6 +95,7 @@ always @(posedge clk) begin
     opcode==`INST_I_XORI                      ? SEL_LOGI :
     opcode==`INST_I_SLTI                      ? SEL_SLT :
 //  opcode==`INST_I_SLTIU                     ? SEL_SLTU:
+    opcode==`INST_I_LUI                       ? SEL_LI  :
 //  opcode==`INST_I_LB    ||
 //  opcode==`INST_I_LH    ||
 //  opcode==`INST_I_LBU   ||
@@ -101,7 +107,7 @@ always @(posedge clk) begin
     opcode==`INST_R && funct==`FUNCT_ADD  ||
     opcode==`INST_R && funct==`FUNCT_ADDU     ? SEL_ADD :
     opcode==`INST_R && funct==`FUNCT_SUB  ||
-//  opcode==`INST_R && funct==`FUNCT_SUBU     ? SEL_SUB :
+    opcode==`INST_R && funct==`FUNCT_SUBU     ? SEL_SUB :
     opcode==`INST_R && funct==`FUNCT_AND      ? SEL_LOGI :
     opcode==`INST_R && funct==`FUNCT_OR       ? SEL_LOGI :
     opcode==`INST_R && funct==`FUNCT_XOR      ? SEL_LOGI :
@@ -120,12 +126,13 @@ end
 assign  rslt =
   rslt_sel==SEL_LOGI  ? rslt_logi:
   rslt_sel==SEL_ADD   ? rslt_add :
-//rslt_sel==SEL_SUB   ? rslt_sub :
+  rslt_sel==SEL_SUB   ? rslt_sub :
   rslt_sel==SEL_SLL   ? rslt_sll :
   rslt_sel==SEL_SRL   ? rslt_srl :
 //rslt_sel==SEL_SRA   ? rslt_sra :
   rslt_sel==SEL_SLT   ? rslt_slt :
 //rslt_sel==SEL_SLTU  ? rslt_sltu:
+  rslt_sel==SEL_LI    ? rslt_li  :
                         32'hXXXX;
 
 reg [5-1:0] last_shamt=0;
