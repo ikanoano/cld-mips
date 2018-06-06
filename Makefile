@@ -27,6 +27,7 @@ start-%.o: %.o startup.o
 		$< $@
 	sed -i -E -e "s/([0-9A-F]) /\1/g" -e "s/([0-9A-F]{8})/\1\n/g" $@
 	sed -i -E -e "/^\r/d" $@
+	perl -pi -e 's/^@([0-9A-F]+)/sprintf "@%x", hex($$1)\/4/ge' $@
 	ln -sf $@ imem.mem
 
 %.dmem : start-%.o
@@ -39,6 +40,7 @@ start-%.o: %.o startup.o
 		$< $@
 	sed -i -E -e "s/([0-9A-F]) /\1/g" -e "s/([0-9A-F]{8})/\1\n/g" $@
 	sed -i -E -e "/^\r/d" $@
+	perl -pi -e 's/^@([0-9A-F]+)/sprintf "@%x", hex($$1)\/4/ge' $@
 	ln -sf $@ dmem.mem
 
 
