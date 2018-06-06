@@ -27,7 +27,7 @@ start-%.o: %.o startup.o
 		$< $@
 	sed -i -E -e "s/([0-9A-F]) /\1/g" -e "s/([0-9A-F]{8})/\1\n/g" $@
 	sed -i -E -e "/^\r/d" $@
-	ln -sf $@ main.imem
+	ln -sf $@ imem.mem
 
 %.dmem : start-%.o
 	mipsel-linux-gnu-objcopy $(OCFLAGS) \
@@ -39,7 +39,7 @@ start-%.o: %.o startup.o
 		$< $@
 	sed -i -E -e "s/([0-9A-F]) /\1/g" -e "s/([0-9A-F]{8})/\1\n/g" $@
 	sed -i -E -e "/^\r/d" $@
-	ln -sf $@ main.dmem
+	ln -sf $@ dmem.mem
 
 
 

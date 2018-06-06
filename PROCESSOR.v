@@ -65,7 +65,7 @@ end
 MEM #(
   .WIDTH(32),
   .WORD(4096),
-  .LOADFILE("main.imem")
+  .LOADFILE("imem.mem")
 ) imem (
   .clk(clk),            .rst(rst),
   .addr({2'b0, pc[IF]}),
@@ -226,7 +226,7 @@ wire[32-1:0]  ldd_wa;
 MEM #(
   .WIDTH(32),
   .WORD(4096),
-  .LOADFILE("main.dmem")
+  .LOADFILE("dmem.mem")
 ) dmem (
   .clk(clk),    .rst(rst),
   .addr(memaddr),
