@@ -195,21 +195,22 @@ end
 
 wire[30-1:0]  branch_addr = {{14{immi[EX][15]}}, immi[EX]} + pc4[EX];
 wire[30-1:0]  jump_addr   = {pc[EX][29:26],      immj[EX]};
-//assign      jal =   //jump and link
-//  opcode[EX] == `INST_J_JAL ||
+wire          jal =   //jump and link
+  opcode[EX] == `INST_J_JAL;// ||
 // (opcode[EX] == `INST_R && funct[EX] == `FUNCT_JALR);
 wire          jr  =   //jump register
   opcode[EX] == `INST_R && (funct[EX] == `FUNCT_JR /*|| funct[EX] == `FUNCT_JALR*/);
-reg   opj=0, opbeq=0, opbne=0;
+reg   opj=0, opbeq=0, opbne=0, jal_mm=0;
 always @(posedge clk) begin
   btpc[MM] <=  // branch target
-    //opcode[EX]==`INST_J_JAL ||
-    opcode[EX]==`INST_J_J   ? jump_addr   :
-    jr                      ? rrs_fwd     :
+    opcode[EX]==`INST_J_JAL ||
+    opcode[EX]==`INST_J_J   ? jump_addr     :
+    jr                      ? rrs_fwd[2+:30]:
                               branch_addr;
-  opj   <= opcode[EX]==`INST_J_J || jr;
+  opj   <= opcode[EX]==`INST_J_J || jr || jal;
   opbeq <= opcode[EX]==`INST_I_BEQ;
   opbne <= opcode[EX]==`INST_I_BNE;
+  jal_mm<= jal;
 end
 
 always @(posedge clk) begin
@@ -220,6 +221,7 @@ always @(posedge clk) begin
     $finish();
   end
 end
+
 
 // MM ------------------------------------------------------------
 wire[32-1:0]  ldd_wa;
@@ -232,11 +234,13 @@ MEM #(
   .addr(memaddr),
   .out(ldd_wa),  .in(rrt[MM]), .we(mwe[MM]&&valid[MM])
 );
-always @(posedge clk) rslt[WA]  <= rst ? 0 : rslt_mm;
+always @(posedge clk) rslt[WA]  <=
+  rst     ? 0               :
+  jal_mm  ? {pc4[MM], 2'h0} :
+            rslt_mm;
 
 // Check branch prediction
 wire  btaken = // Is actual condition taken?
-  //jal ||
   opj                         ||
   (opbeq && rrs[MM]==rrt[MM]) ||
   (opbne && rrs[MM]!=rrt[MM]);
@@ -258,6 +262,7 @@ always @(posedge clk) begin
   branch_wa <= rst ? 0 : opj || opbeq || opbne;
 end
 
+
 // WA ------------------------------------------------------------
 reg [32-1:0]  rrd_wb = 0;
 assign  w_rrd_wa= mld[WA] ? ldd_wa : rslt[WA];
@@ -266,8 +271,10 @@ always @(posedge clk) rwe_valid_wb  <= rst ? 0 : rwe[WA]&&valid[WA];
 
 assign  bact_wa = {branch_wa, btaken_wa ? btpc[WA] : pc4[WA]};
 
+
 // WB ------------------------------------------------------------
 assign  w_rrd   = rrd_wb;
+
 
 // misc ----------------------------------------------------------
 always @(posedge clk) led <= rslt[WA];

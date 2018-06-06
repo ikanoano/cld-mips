@@ -37,6 +37,7 @@ _start:
     move    $30,  $0
     move    $31,  $0
     li      $sp,  0x3ff0
+    li      $ra,  0x8c    # jump and link
     j       main
     nop
     nop

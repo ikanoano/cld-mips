@@ -13,7 +13,7 @@
 `define INST_I_BNE      6'h05
 
 `define INST_J_J        6'h02
-//`define INST_J_JAL      6'h03
+`define INST_J_JAL      6'h03
 
 //`define INST_I_LB       6'h20
 //`define INST_I_LH       6'h21
