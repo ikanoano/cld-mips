@@ -45,5 +45,5 @@
 //`define FUNCT_SRLV      6'h06
 //`define FUNCT_SRAV      6'h07
 
-//`define FUNCT_JR        6'h08
+`define FUNCT_JR        6'h08
 //`define FUNCT_JALR      6'h09
