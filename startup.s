@@ -36,7 +36,7 @@ _start:
     move    $29,  $0
     move    $30,  $0
     move    $31,  $0
-    li      $sp,  0x0ff0
+    li      $sp,  0x3ff0
     j       main
     nop
     nop
@@ -45,6 +45,7 @@ _start:
     nop
     nop
     nop
+    nop     # halt
 
     .end    _start
 

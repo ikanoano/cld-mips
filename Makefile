@@ -4,7 +4,7 @@ CC  = mipsel-linux-gnu-gcc -std=c11 -c -O2 -Wall -nostdlib -mno-memcpy -static -
 VCS = vcs -full64 -v2005 -Wall -LDFLAGS -no-pie
 
 LDFLAGS  = -T cld-mips.ld -nostdlib -static
-OCFLAGS  = -O verilog --reverse-bytes=4
+OCFLAGS  = -O verilog
 
 .PRECIOUS: %.imem %.dmem
 
@@ -24,22 +24,24 @@ start-%.o: %.o startup.o
 		-j .startup \
 		-j .init \
 		-j .text \
-		$< $<.itext
-	cp $<.itext $@
+		$< $@
+	sed -i -E -e "s/([0-9A-F]) /\1/g" -e "s/([0-9A-F]{8})/\1\n/g" $@
+	sed -i -E -e "/^\r/d" $@
 	ln -sf $@ main.imem
 
 %.dmem : start-%.o
 	mipsel-linux-gnu-objcopy $(OCFLAGS) \
+		-j .simdebug \
 		-j .rodata \
 		-j .data \
 		-j .bss \
 		--change-addresses -0x10000000 \
-		$< $<.dtext
-	cp $<.dtext $@
+		$< $@
+	sed -i -E -e "s/([0-9A-F]) /\1/g" -e "s/([0-9A-F]{8})/\1\n/g" $@
+	sed -i -E -e "/^\r/d" $@
 	ln -sf $@ main.dmem
 
 
-#sed -E "s/(([0-9A-F]{2}) )/\2/g" < $<.text | sed -E "s/([0-9A-F]{8})/\1\n/g" | sed -E "s/\r//g" | sed "/^$$/d" > $@
 
 %.mem: %.imem %.dmem
 	:

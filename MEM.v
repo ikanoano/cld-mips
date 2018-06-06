@@ -4,7 +4,8 @@
 
 module MEM #(
   parameter WIDTH   = 32,
-  parameter WORD    = 1024
+  parameter WORD    = 1024,
+  parameter LOADFILE= "main.imem"
 ) (
   input   wire              clk,
   input   wire              rst,
@@ -27,7 +28,7 @@ integer i;
 initial begin
   // Initialize with dummy value or mem will be eliminated by optimization.
   for (i = 0; i < WORD; i = i + 1) mem[i] = WORD-i;
-  $readmemh("main.mem", mem, 0, WORD-1);
+  $readmemh(LOADFILE, mem, 0, WORD-1);
 end
 
 endmodule
