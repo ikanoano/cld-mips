@@ -33,7 +33,7 @@ integer i;
 always @(posedge clk) begin
   //r[8] == $t0
   #10
-  $write("pc=%x ir=%x :\n", p.pc[1], p.ir_ig);
+  $write("pc=%x ir=%x :\n", {p.pc[1],2'h0}, p.ir_ig);
   for(i=0; i<32; i=i+1) begin
     $write("%x,", p.regfile.r[i]);
     if((i+1)%8==0) $write("\n");
@@ -46,6 +46,11 @@ always @(posedge clk) begin
     $display("");
     $display("halt!");
     $display("cycle = %d", cycle);
+    $display("\ndmem:");
+    for(i=0; i<16; i=i+1) begin
+      $write("%x,", p.dmem.mem[i]);
+      if((i+1)%8==0) $write("\n");
+    end
     $finish();
   end
   if(cycle>10000000) begin
