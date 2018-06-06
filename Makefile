@@ -4,7 +4,7 @@ CC  = mipsel-linux-gnu-gcc -std=c11 -c -O2 -Wall -nostdlib -mno-memcpy -static -
 VCS = vcs -full64 -v2005 -Wall -LDFLAGS -no-pie
 
 LDFLAGS  = -T cld-mips.ld -nostdlib -static
-OCFLAGS  = -O verilog
+OCFLAGS  = -O verilog --reverse-bytes=4
 
 .PRECIOUS: %.imem %.dmem
 
