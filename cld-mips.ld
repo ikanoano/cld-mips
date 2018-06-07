@@ -11,10 +11,15 @@ SECTIONS {
   .init       : { . = ALIGN(4); KEEP (*(.init)) } > IMEM
   .text       : { . = ALIGN(4); *(.text)
                   . = ALIGN(4); *(.text*)} > IMEM
+  .ctors      : { . = ALIGN(4); KEEP (*(.ctors)) } > IMEM
+  .dtors      : { . = ALIGN(4); KEEP (*(.dtors)) } > IMEM
 
   . = 0x10000000;
   .simdebug   : { __debug_head = .; . = . + 0x40; } > DMEM
-  .rodata     : { . = ALIGN(4); *(.rodata) } > DMEM
-  .data       : { . = ALIGN(4); *(.data) } > DMEM
-  .bss        : { . = ALIGN(4); *(.bss) } > DMEM
+  .rodata     : { . = ALIGN(4); *(.rodata)
+                  . = ALIGN(4); *(.rodata*) } > DMEM
+  .data       : { . = ALIGN(4); *(.data)
+                  . = ALIGN(4); *(.data*) } > DMEM
+  .bss        : { . = ALIGN(4); *(.bss)
+                  . = ALIGN(4); *(.bss) } > DMEM
 }

@@ -24,6 +24,8 @@ start-%.o: %.o startup.o
 		-j .startup \
 		-j .init \
 		-j .text \
+		-j .ctors \
+		-j .dtors \
 		$< $@
 	sed -i -E -e "s/([0-9A-F]) /\1/g" -e "s/([0-9A-F]{8})/\1\n/g" $@
 	sed -i -E -e "/^\r/d" $@
