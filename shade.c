@@ -1,6 +1,9 @@
 #include <stdint-gcc.h>
 #define WIDTH   40
 #define HEIGHT  30
+extern const int __debug_head;
+
+volatile uint32_t *dbg = &__debug_head;
 
 volatile uint32_t array[HEIGHT+2][WIDTH+2] = {{2,3}, {0,1}}; //image data
 int main() {
@@ -19,10 +22,13 @@ int main() {
     array[y][x] = sum >> 4;   // array[y][x] = sum / 16
   }
 
-  register int a, b, c, d;
-  a = array[HEIGHT/4][WIDTH/4];
-  b = array[HEIGHT/2][WIDTH/2];
-  c = array[HEIGHT  ][WIDTH/2];
-  d = array[HEIGHT/2][WIDTH  ];
+  for (int i = 0; i < 16; i++) {
+    dbg[i] = 0;
+  }
+
+  dbg[0] = array[HEIGHT/8][WIDTH/8];
+  dbg[1] = array[HEIGHT/4][WIDTH/4];
+  dbg[2] = array[HEIGHT/2][WIDTH/4];
+  dbg[3] = array[HEIGHT/4][WIDTH/2];
   //printf("%x, %x, %x, %x\n", a, b, c, d);
 }
