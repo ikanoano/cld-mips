@@ -192,6 +192,7 @@ reg [32-1:0]  memaddr=0;
 always @(posedge clk) begin
   memaddr <= rst ? 0 : {2'b0, rrs_fwd[2+:30]+{{14{immi[EX][15]}}, immi[EX][2+:14]}};
 end
+wire[32-1:0]  memaddr_human = {memaddr[2+:30], 2'h0};
 
 wire[30-1:0]  branch_addr = {{14{immi[EX][15]}}, immi[EX]} + pc4[EX];
 wire[30-1:0]  jump_addr   = {pc[EX][29:26],      immj[EX]};
